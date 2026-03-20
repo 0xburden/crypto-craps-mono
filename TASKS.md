@@ -226,35 +226,35 @@ implemented and tested by a parallel subagent against the mock VRF harness.
 
 | ID | Task | Subagent hint | Status |
 |----|------|---------------|--------|
-| 4.1 | **Odds Bets** — Pass Line Odds, Don't Pass Odds | Odds agent | [ ] |
-| 4.1a | — Placement: only allowed after point established; amount ≤ 3× line bet; required multiple enforced | Odds agent | [ ] |
-| 4.1b | — Payout: true odds by point (4/10: 2:1, 5/9: 3:2, 6/8: 6:5); Don't Pass lays (reverses ratio) | Odds agent | [ ] |
-| 4.1c | — Odds bets are always working and always off on 7-out (returned) | Odds agent | [ ] |
-| 4.1d | — Tests: `test/unit/OddsBets.test.ts` — all six points, both sides, 7-out return | Test agent | [ ] |
-| 4.2 | **Come / Don't Come Bets** (4 slots each) | Come agent | [ ] |
-| 4.2a | — Come bet placement: only when puck is ON; bet placed in "traveling" state until next roll | Come agent | [ ] |
-| 4.2b | — Come-out roll for come bet: natural wins (7/11), craps loses (2/3/12) | Come agent | [ ] |
-| 4.2c | — Point established for come bet: moves to numbered slot; persists until that number or 7-out | Come agent | [ ] |
-| 4.2d | — Come Odds: placed on established come bet number; 3× limit; same true-odds payout table | Come agent | [ ] |
-| 4.2e | — Don't Come: mirror of Don't Pass but initiated while puck is ON | Come agent | [ ] |
-| 4.2f | — Tests: `test/unit/ComeBets.test.ts` — come natural, come craps, establish + hit, establish + 7-out, all 4 slots, DC mirror | Test agent | [ ] |
-| 4.3 | **Place Bets** (4/5/6/8/9/10) | Place agent | [ ] |
-| 4.3a | — Placement: only when puck is ON; required multiples enforced ($5 for 4/5/9/10, $6 for 6/8) | Place agent | [ ] |
-| 4.3b | — Win: number rolled before 7; Lose: 7 out | Place agent | [ ] |
-| 4.3c | — Payouts: 9:5 for 4/10, 7:5 for 5/9, 7:6 for 6/8 | Place agent | [ ] |
-| 4.3d | — Place bets remain after a win (press or leave — no auto-removal; player must `removeBet`) | Place agent | [ ] |
-| 4.3e | — Tests: `test/unit/PlaceBets.test.ts` — all six numbers, win/lose, 7-out removes all, payout multiples | Test agent | [ ] |
-| 4.4 | **Hardway Bets** (Hard 4/6/8/10) | Hardway agent | [ ] |
-| 4.4a | — Win condition: dice show the hard pair (e.g., 2+2 for Hard 4) | Hardway agent | [ ] |
-| 4.4b | — Loss condition: 7 rolled, OR easy way (e.g., 1+3, 3+1 for Hard 4) | Hardway agent | [ ] |
-| 4.4c | — Payouts: 7:1 for Hard 4/10, 9:1 for Hard 6/8 | Hardway agent | [ ] |
-| 4.4d | — Hardways persist across multiple rolls until resolved | Hardway agent | [ ] |
-| 4.4e | — Tests: `test/unit/HardwayBets.test.ts` — each hard number, win, easy-way loss, 7-out loss, persistence | Test agent | [ ] |
-| 4.5 | **One-Roll Props** (Any 7, Any Craps, Craps 2/3/12, Yo, Twelve, Horn) | Props agent | [ ] |
-| 4.5a | — All prop bets resolve on the very next roll regardless of puck state | Props agent | [ ] |
-| 4.5b | — Horn: 4-unit bet split across 2/3/11/12; losing units subtracted from winning payout | Props agent | [ ] |
-| 4.5c | — Tests: `test/unit/PropBets.test.ts` — each prop type wins, each prop type loses, Horn net payout math | Test agent | [ ] |
-| 4.6 | **Worst-case reserve audit** — run `maxPossiblePayout` against a maximally-loaded session (all bets at max, all odds at 3×) and verify the reserve amount matches manual derivation from PLAN.md §Bankroll Sizing | Audit agent | [ ] |
+| 4.1 | **Odds Bets** — Pass Line Odds, Don't Pass Odds | Odds agent | [x] |
+| 4.1a | — Placement: only allowed after point established; amount ≤ 3× line bet; required multiple enforced | Odds agent | [x] |
+| 4.1b | — Payout: true odds by point (4/10: 2:1, 5/9: 3:2, 6/8: 6:5); Don't Pass lays (reverses ratio) | Odds agent | [x] |
+| 4.1c | — Odds bets are always working and always off on 7-out (returned) | Odds agent | [x] |
+| 4.1d | — Tests: `test/unit/OddsBets.test.ts` — all six points, both sides, 7-out return | Test agent | [x] |
+| 4.2 | **Come / Don't Come Bets** (4 slots each) | Come agent | [x] |
+| 4.2a | — Come bet placement: only when puck is ON; bet placed in "traveling" state until next roll | Come agent | [x] |
+| 4.2b | — Come-out roll for come bet: natural wins (7/11), craps loses (2/3/12) | Come agent | [x] |
+| 4.2c | — Point established for come bet: moves to numbered slot; persists until that number or 7-out | Come agent | [x] |
+| 4.2d | — Come Odds: placed on established come bet number; 3× limit; same true-odds payout table | Come agent | [x] |
+| 4.2e | — Don't Come: mirror of Don't Pass but initiated while puck is ON | Come agent | [x] |
+| 4.2f | — Tests: `test/unit/ComeBets.test.ts` — come natural, come craps, establish + hit, establish + 7-out, all 4 slots, DC mirror | Test agent | [x] |
+| 4.3 | **Place Bets** (4/5/6/8/9/10) | Place agent | [x] |
+| 4.3a | — Placement: only when puck is ON; required multiples enforced ($5 for 4/5/9/10, $6 for 6/8) | Place agent | [x] |
+| 4.3b | — Win: number rolled before 7; Lose: 7 out | Place agent | [x] |
+| 4.3c | — Payouts: 9:5 for 4/10, 7:5 for 5/9, 7:6 for 6/8 | Place agent | [x] |
+| 4.3d | — Place bets remain after a win (press or leave — no auto-removal; player must `removeBet`) | Place agent | [x] |
+| 4.3e | — Tests: `test/unit/PlaceBets.test.ts` — all six numbers, win/lose, 7-out removes all, payout multiples | Test agent | [x] |
+| 4.4 | **Hardway Bets** (Hard 4/6/8/10) | Hardway agent | [x] |
+| 4.4a | — Win condition: dice show the hard pair (e.g., 2+2 for Hard 4) | Hardway agent | [x] |
+| 4.4b | — Loss condition: 7 rolled, OR easy way (e.g., 1+3, 3+1 for Hard 4) | Hardway agent | [x] |
+| 4.4c | — Payouts: 7:1 for Hard 4/10, 9:1 for Hard 6/8 | Hardway agent | [x] |
+| 4.4d | — Hardways persist across multiple rolls until resolved | Hardway agent | [x] |
+| 4.4e | — Tests: `test/unit/HardwayBets.test.ts` — each hard number, win, easy-way loss, 7-out loss, persistence | Test agent | [x] |
+| 4.5 | **One-Roll Props** (Any 7, Any Craps, Craps 2/3/12, Yo, Twelve, Horn) | Props agent | [x] |
+| 4.5a | — All prop bets resolve on the very next roll regardless of puck state | Props agent | [x] |
+| 4.5b | — Horn: 4-unit bet split across 2/3/11/12; losing units subtracted from winning payout | Props agent | [x] |
+| 4.5c | — Tests: `test/unit/PropBets.test.ts` — each prop type wins, each prop type loses, Horn net payout math | Test agent | [x] |
+| 4.6 | **Worst-case reserve audit** — run `maxPossiblePayout` against a maximally-loaded session (all bets at max, all odds at 3×) and verify the reserve amount matches manual derivation from PLAN.md §Bankroll Sizing | Audit agent | [x] |
 
 **Phase 4 exit criteria:**
 - All unit test files in `test/unit/` pass

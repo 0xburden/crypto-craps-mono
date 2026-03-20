@@ -5,8 +5,31 @@ export const usd = (value: number) => BigInt(value) * UNIT;
 
 export const BetType = {
   PASS_LINE: 0,
+  PASS_LINE_ODDS: 1,
   DONT_PASS: 2,
-  FIELD: 14
+  DONT_PASS_ODDS: 3,
+  COME: 4,
+  COME_ODDS: 5,
+  DONT_COME: 6,
+  DONT_COME_ODDS: 7,
+  PLACE_4: 8,
+  PLACE_5: 9,
+  PLACE_6: 10,
+  PLACE_8: 11,
+  PLACE_9: 12,
+  PLACE_10: 13,
+  FIELD: 14,
+  HARD_4: 15,
+  HARD_6: 16,
+  HARD_8: 17,
+  HARD_10: 18,
+  ANY_7: 19,
+  ANY_CRAPS: 20,
+  CRAPS_2: 21,
+  CRAPS_3: 22,
+  YO: 23,
+  TWELVE: 24,
+  HORN: 25
 } as const;
 
 export const SessionPhase = {

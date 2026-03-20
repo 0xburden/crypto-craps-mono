@@ -13,13 +13,19 @@ const config: HardhatUserConfig = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 200
+        runs: 1
       },
+      viaIR: true,
       evmVersion: "cancun"
     }
   },
   networks: {
-    hardhat: {},
+    hardhat: {
+      hardfork: "cancun",
+      allowUnlimitedContractSize: true,
+      blockGasLimit: 60_000_000,
+      gas: 30_000_000
+    },
     baseSepolia: {
       url: process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org",
       accounts: process.env.DEPLOYER_PRIVATE_KEY

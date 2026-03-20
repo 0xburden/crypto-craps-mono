@@ -2,6 +2,8 @@ import { expect } from "chai";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { ethers } from "hardhat";
 
+import { encodeDice } from "./helpers/gameFixture";
+
 const UNIT = 10n ** 6n;
 const usd = (value: number) => BigInt(value) * UNIT;
 const feeFor = (amount: bigint) => (amount * 50n) / 10_000n;
@@ -351,15 +353,32 @@ describe("Vault", function () {
     expect(await game.availableBalanceOf(alice.address)).to.equal(usd(99_5) / 10n);
   });
 
-  it("keeps unimplemented phase 4 entrypoints explicitly reverting", async function () {
-    const { alice, game } = await loadFixture(deployFixture);
+  it("routes phase 4 entrypoints through live validation instead of placeholder reverts", async function () {
+    const { owner, alice, coordinator, game } = await loadFixture(deployFixture);
 
+    await coordinator.createSubscription();
+    await coordinator.addConsumer(1, await game.getAddress());
+
+    await game.connect(owner).fundBankroll(usd(100_000));
+    await game.connect(alice).deposit(usd(1_000));
     await expect(game.connect(alice).openSession()).to.emit(game, "SessionOpened").withArgs(alice.address);
-    await expect(game.connect(alice).closeSession()).to.emit(game, "SessionClosed").withArgs(alice.address, 0n);
 
-    await expect(game.connect(alice).placeIndexedBet(4, 0, usd(1))).to.be.revertedWith("Phase 4 not implemented");
-    await expect(game.connect(alice).removeIndexedBet(0, 0)).to.be.revertedWith("Phase 4 not implemented");
-    await expect(game.connect(alice).setPlaceWorking(4, true)).to.be.revertedWith("Phase 4 not implemented");
+    await expect(game.connect(alice).placeIndexedBet(5, 0, usd(100)))
+      .to.be.revertedWithCustomError(game, "BetUnavailable");
+    await expect(game.connect(alice).removeIndexedBet(6, 0))
+      .to.be.revertedWithCustomError(game, "NoActiveBet");
+    await expect(game.connect(alice).setPlaceWorking(4, true))
+      .to.be.revertedWithCustomError(game, "NoActiveBet");
+
+    await game.connect(alice).placeBet(2, usd(100));
+    await game.connect(alice).rollDice();
+    const state = await game.getPlayerState(alice.address);
+    await coordinator.fulfillRandomWords(state.pendingRequestId, [encodeDice(2, 3)]);
+
+    await expect(game.connect(alice).placeIndexedBet(5, 0, usd(100)))
+      .to.be.revertedWithCustomError(game, "NoActiveBet");
+    await expect(game.connect(alice).setPlaceWorking(4, false))
+      .to.be.revertedWithCustomError(game, "NoActiveBet");
   });
 
   it("survives 50 deterministic random deposit and withdraw operations with the invariant checked on every step", async function () {

@@ -159,6 +159,17 @@ contract MockVRFCoordinator is IVRFCoordinatorV2Plus {
         require(request.exists, "request not found");
         require(words.length == request.numWords, "wrong word count");
 
+        _fulfillRandomWords(request, requestId, words);
+    }
+
+    function fulfillRandomWordsUnchecked(uint256 requestId, uint256[] calldata words) external {
+        PendingRequest memory request = pendingRequests[requestId];
+        require(request.exists, "request not found");
+
+        _fulfillRandomWords(request, requestId, words);
+    }
+
+    function _fulfillRandomWords(PendingRequest memory request, uint256 requestId, uint256[] calldata words) private {
         delete pendingRequests[requestId];
         _pendingRequestCountBySubId[request.subId] -= 1;
 

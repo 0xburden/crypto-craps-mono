@@ -28,6 +28,20 @@ contract CrapsGameHarness is CrapsGame {
         pendingVRFRequests = pendingVRFRequests_;
     }
 
+    function exposedSetSessionState(
+        address player,
+        SessionPhase phase,
+        uint8 point,
+        uint256 pendingRequestId,
+        uint48 lastActivityTime
+    ) external {
+        SessionData storage session = _sessions[player];
+        session.phase = phase;
+        session.point = point;
+        session.pendingRequestId = pendingRequestId;
+        session.lastActivityTime = lastActivityTime;
+    }
+
     function exposedAssertInvariant() external view {
         _assertInvariant();
     }

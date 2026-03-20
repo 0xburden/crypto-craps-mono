@@ -8,8 +8,8 @@
     "clean": "hardhat clean",
     "compile": "hardhat compile",
     "test": "hardhat test",
-    "coverage": "hardhat coverage",
-    "coverage:vault": "hardhat coverage --testfiles 'test/unit/Vault.test.ts' && node scripts/check-vault-coverage.mjs",
+    "coverage": "TS_NODE_CACHE=false DISABLE_V8_COMPILE_CACHE=1 hardhat coverage",
+    "coverage:vault": "TS_NODE_CACHE=false DISABLE_V8_COMPILE_CACHE=1 hardhat coverage --testfiles 'test/unit/Vault.test.ts' && node scripts/check-vault-coverage.mjs",
     "node": "hardhat node"
   },
   "devDependencies": {
