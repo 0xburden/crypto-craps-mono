@@ -65,7 +65,10 @@ const config: HardhatUserConfig = {
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS === "true",
-    currency: "USD"
+    currency: "USD",
+    outputJSON: process.env.REPORT_GAS === "true",
+    outputJSONFile: "gas-report-baseline.json",
+    showMethodSig: true
   }
 };
 

@@ -271,16 +271,16 @@ internal functions — only `MockERC20` and `MockVRFCoordinator` are permitted.
 
 | ID | Task | Subagent hint | Status |
 |----|------|---------------|--------|
-| 5.1 | **Scenario: Happy path deposit → play → withdraw** — deposit $500, play 10 rounds (mix of wins/losses), withdraw remaining balance; verify fee accrual and bankroll changes | Integration agent | [ ] |
-| 5.2 | **Scenario: Session expiry during active play** — place bets, simulate 24-hour timeout, call `expireSession`, verify all `_inPlay` returned to `_available`, verify player can withdraw | Integration agent | [ ] |
-| 5.3 | **Scenario: Session expiry during ROLL_PENDING** — place bets, call `rollDice`, advance time 24h, call `expireSession`, verify reserve released back to bankroll, verify late callback is a no-op | Integration agent | [ ] |
-| 5.4 | **Scenario: Bankroll runs out mid-session** — fund minimal bankroll, load session with max bets, verify `rollDice` reverts with `InsufficientBankroll` when reserve requirement exceeds available bankroll | Integration agent | [ ] |
-| 5.5 | **Scenario: Self-exclusion lifecycle** — play, self-exclude (session closed immediately), attempt bet (fails), withdraw (succeeds), reinstatement request, advance 7 days, complete reinstatement, resume play | Integration agent | [ ] |
-| 5.6 | **Scenario: Operator exclusion** — operator excludes player mid-session, verify session closed, verify withdrawal still works, operator reinstates, player resumes | Integration agent | [ ] |
-| 5.7 | **Scenario: Multi-player concurrent sessions** — three players each open sessions, place bets, request rolls simultaneously; fulfill VRF in different orders; verify each player's state is isolated and invariant holds across all callbacks | Integration agent | [ ] |
-| 5.8 | **Scenario: Emergency pause and bankroll recovery** — pause contract, verify no deposits/bets/rolls; verify withdrawals still work; owner withdraws fees; owner withdraws bankroll (requires paused) | Integration agent | [ ] |
-| 5.9 | **Invariant test suite** — property-based test that runs 200 random action sequences (random deposit/bet/roll/withdraw by random players) and asserts the five-bucket invariant holds after every action | Fuzzing agent | [ ] |
-| 5.10 | **Gas profiling baseline** — run all integration scenarios with `hardhat-gas-reporter`, document gas cost for: `deposit`, `withdraw`, `rollDice`, `fulfillRandomWords` (best/worst case), `expireSession`; save baseline to `gas-report-baseline.json` | Gas agent | [ ] |
+| 5.1 | **Scenario: Happy path deposit → play → withdraw** — deposit $500, play 10 rounds (mix of wins/losses), withdraw remaining balance; verify fee accrual and bankroll changes | Integration agent | [x] |
+| 5.2 | **Scenario: Session expiry during active play** — place bets, simulate 24-hour timeout, call `expireSession`, verify all `_inPlay` returned to `_available`, verify player can withdraw | Integration agent | [x] |
+| 5.3 | **Scenario: Session expiry during ROLL_PENDING** — place bets, call `rollDice`, advance time 24h, call `expireSession`, verify reserve released back to bankroll, verify late callback is a no-op | Integration agent | [x] |
+| 5.4 | **Scenario: Bankroll runs out mid-session** — fund minimal bankroll, load session with max bets, verify `rollDice` reverts with `InsufficientBankroll` when reserve requirement exceeds available bankroll | Integration agent | [x] |
+| 5.5 | **Scenario: Self-exclusion lifecycle** — play, self-exclude (session closed immediately), attempt bet (fails), withdraw (succeeds), reinstatement request, advance 7 days, complete reinstatement, resume play | Integration agent | [x] |
+| 5.6 | **Scenario: Operator exclusion** — operator excludes player mid-session, verify session closed, verify withdrawal still works, operator reinstates, player resumes play | Integration agent | [x] |
+| 5.7 | **Scenario: Multi-player concurrent sessions** — three players each open sessions, place bets, request rolls simultaneously; fulfill VRF in different orders; verify each player's state is isolated and invariant holds across all callbacks | Integration agent | [x] |
+| 5.8 | **Scenario: Emergency pause and bankroll recovery** — pause contract, verify no deposits/bets/rolls; verify withdrawals still work; owner withdraws fees; owner withdraws bankroll (requires paused) | Integration agent | [x] |
+| 5.9 | **Invariant test suite** — property-based test that runs 200 random action sequences (random deposit/bet/roll/withdraw by random players) and asserts the five-bucket invariant holds after every action | Fuzzing agent | [x] |
+| 5.10 | **Gas profiling baseline** — run all integration scenarios with `hardhat-gas-reporter`, document gas cost for: `deposit`, `withdraw`, `rollDice`, `fulfillRandomWords` (best/worst case), `expireSession`; save baseline to `gas-report-baseline.json` | Gas agent | [x] |
 
 **Phase 5 exit criteria:**
 - `npx hardhat test test/integration/` — 100% pass
