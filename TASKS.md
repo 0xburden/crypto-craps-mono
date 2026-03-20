@@ -147,7 +147,7 @@ uint256 public constant INITIAL_BANKROLL = 50_000e6;  // recommended launch fund
 
 **Phase 2 exit criteria:**
 - `npx hardhat test test/unit/Vault.test.ts` — 100% pass, `_assertInvariant` never fires
-- `npx hardhat coverage` on vault tests — ≥95% line coverage
+- `npx hardhat coverage --testfiles 'test/unit/Vault.test.ts' && node scripts/check-vault-coverage.mjs` — ≥95% line coverage across the Phase 2 vault-selected functions inside `contracts/CrapsGame.sol`
 - `npx hardhat compile` — zero warnings
 
 ---

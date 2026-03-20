@@ -703,6 +703,7 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
                 session.phase = priorPoint == 0 ? SessionPhase.COME_OUT : SessionPhase.POINT;
             }
             _softReleaseReserve(player, 0);
+            _assertInvariantIfNeeded();
             return;
         }
 
@@ -712,6 +713,7 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
             session.lastActivityTime = uint48(block.timestamp);
             _softReleaseReserve(player, 0);
             emit RollResolved(player, requestId, 0, 0, 0);
+            _assertInvariantIfNeeded();
             return;
         }
 
@@ -820,5 +822,6 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
         session.lastActivityTime = uint48(block.timestamp);
 
         emit RollResolved(player, requestId, die1, die2, actualPayout);
+        _assertInvariantIfNeeded();
     }
 }

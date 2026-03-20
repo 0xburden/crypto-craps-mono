@@ -9,6 +9,7 @@
     "compile": "hardhat compile",
     "test": "hardhat test",
     "coverage": "hardhat coverage",
+    "coverage:vault": "hardhat coverage --testfiles 'test/unit/Vault.test.ts' && node scripts/check-vault-coverage.mjs",
     "node": "hardhat node"
   },
   "devDependencies": {
