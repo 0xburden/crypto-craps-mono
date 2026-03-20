@@ -6,6 +6,7 @@ import "hardhat-gas-reporter";
 import "solidity-coverage";
 
 const BASESCAN_API_KEY = process.env.BASESCAN_API_KEY ?? "";
+const sourcesPath = process.env.HARDHAT_SOURCES ?? "./contracts";
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -16,7 +17,10 @@ const config: HardhatUserConfig = {
         runs: 1
       },
       viaIR: true,
-      evmVersion: "cancun"
+      evmVersion: "cancun",
+      metadata: {
+        bytecodeHash: "none"
+      }
     }
   },
   networks: {
@@ -69,6 +73,9 @@ const config: HardhatUserConfig = {
     outputJSON: process.env.REPORT_GAS === "true",
     outputJSONFile: "gas-report-baseline.json",
     showMethodSig: true
+  },
+  paths: {
+    sources: sourcesPath
   }
 };
 

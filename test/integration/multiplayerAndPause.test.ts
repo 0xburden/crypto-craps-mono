@@ -45,13 +45,8 @@ async function assertFiveBucketInvariant(
     sumReserved += state.reserved;
   }
 
-  expect(await game.totalAvailable()).to.equal(sumAvailable);
-  expect(await game.totalInPlay()).to.equal(sumInPlay);
-  expect(await game.totalReserved()).to.equal(sumReserved);
-
   const contractBalance = await token.balanceOf(await game.getAddress());
-  const bankroll = await game.bankroll();
-  const accruedFees = await game.accruedFees();
+  const { bankroll, accruedFees } = states[0];
   expect(contractBalance).to.equal(sumAvailable + sumInPlay + sumReserved + bankroll + accruedFees);
 }
 
@@ -84,7 +79,6 @@ describe("Integration: multiplayer and pause", function () {
     expect(alicePending.pendingRequestId).to.not.equal(bobPending.pendingRequestId);
     expect(alicePending.pendingRequestId).to.not.equal(carolPending.pendingRequestId);
     expect(bobPending.pendingRequestId).to.not.equal(carolPending.pendingRequestId);
-    expect(await game.pendingVRFRequests()).to.equal(3n);
 
     await assertFiveBucketInvariant(game, token, [alice, bob, carol]);
 
@@ -106,8 +100,6 @@ describe("Integration: multiplayer and pause", function () {
     expect(aliceState.pendingRequestId).to.equal(aliceRequestId);
     expect(carolState.phase).to.equal(SessionPhase.ROLL_PENDING);
     expect(carolState.pendingRequestId).to.equal(carolRequestId);
-    expect(await game.pendingVRFRequests()).to.equal(2n);
-    expect(await game.requestToPlayer(bobRequestId)).to.equal(ethers.ZeroAddress);
 
     await assertFiveBucketInvariant(game, token, [alice, bob, carol]);
 
@@ -124,8 +116,6 @@ describe("Integration: multiplayer and pause", function () {
     expect(aliceState.pendingRequestId).to.equal(aliceRequestId);
     expect(bobState.phase).to.equal(SessionPhase.POINT);
     expect(bobState.point).to.equal(5n);
-    expect(await game.pendingVRFRequests()).to.equal(1n);
-    expect(await game.requestToPlayer(carolRequestId)).to.equal(ethers.ZeroAddress);
 
     await assertFiveBucketInvariant(game, token, [alice, bob, carol]);
 
@@ -141,8 +131,6 @@ describe("Integration: multiplayer and pause", function () {
     expect(aliceState.reserved).to.equal(0n);
     expect(bobState.phase).to.equal(SessionPhase.POINT);
     expect(carolState.phase).to.equal(SessionPhase.COME_OUT);
-    expect(await game.pendingVRFRequests()).to.equal(0n);
-    expect(await game.requestToPlayer(aliceRequestId)).to.equal(ethers.ZeroAddress);
 
     await assertFiveBucketInvariant(game, token, [alice, bob, carol]);
   });
@@ -170,14 +158,14 @@ describe("Integration: multiplayer and pause", function () {
       .to.emit(game, "FeesWithdrawn")
       .withArgs(treasury.address, usd(5));
     expect(await token.balanceOf(treasury.address)).to.equal(treasuryBeforeFees + usd(5));
-    expect(await game.accruedFees()).to.equal(0n);
+    expect((await game.getPlayerState(alice.address)).accruedFees).to.equal(0n);
 
     const ownerBeforeBankroll = await token.balanceOf(owner.address);
     await expect(game.connect(owner).withdrawBankroll(usd(5_000)))
       .to.emit(game, "BankrollWithdrawn")
       .withArgs(owner.address, usd(5_000));
     expect(await token.balanceOf(owner.address)).to.equal(ownerBeforeBankroll + usd(5_000));
-    expect(await game.bankroll()).to.equal(usd(15_000));
+    expect((await game.getPlayerState(alice.address)).bankroll).to.equal(usd(15_000));
 
     await assertFiveBucketInvariant(game, token, [alice]);
   });

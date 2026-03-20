@@ -89,7 +89,7 @@ describe("Integration / Session flows", function () {
 
     const postPlayState = await game.getPlayerState(alice.address);
     expect(postPlayState.accruedFees).to.equal(DEPOSIT_AMOUNT / 200n);
-    expect(await game.bankroll()).to.equal(expectedBankrollStart - usd(50));
+    expect(postPlayState.bankroll).to.equal(expectedBankrollStart - usd(50));
 
     await game.connect(alice).closeSession();
     const closedState = await game.getPlayerState(alice.address);
@@ -100,8 +100,9 @@ describe("Integration / Session flows", function () {
     await expect(game.connect(alice).withdraw(withdrawAmount)).to.emit(game, "Withdrawal").withArgs(alice.address, withdrawAmount);
 
     expect(await token.balanceOf(alice.address)).to.equal(aliceStart - DEPOSIT_AMOUNT + withdrawAmount);
-    expect((await game.getPlayerState(alice.address)).available).to.equal(0n);
-    expect(await game.accruedFees()).to.equal(DEPOSIT_AMOUNT / 200n);
+    const withdrawnState = await game.getPlayerState(alice.address);
+    expect(withdrawnState.available).to.equal(0n);
+    expect(withdrawnState.accruedFees).to.equal(DEPOSIT_AMOUNT / 200n);
   });
 
   it("expires an active session during play and returns in-play funds to available", async function () {
@@ -145,7 +146,7 @@ describe("Integration / Session flows", function () {
 
     expect(pendingState.phase).to.equal(SessionPhase.ROLL_PENDING);
     expect(pendingState.reserved).to.equal(FIELD_BET * 2n);
-    expect(await game.bankroll()).to.equal(INITIAL_BANKROLL - FIELD_BET * 2n);
+    expect(pendingState.bankroll).to.equal(INITIAL_BANKROLL - FIELD_BET * 2n);
 
     await time.increase(SESSION_TIMEOUT_SECONDS + 1);
 
@@ -158,8 +159,7 @@ describe("Integration / Session flows", function () {
     expect(expiredState.reserved).to.equal(0n);
     expect(expiredState.pendingRequestId).to.equal(0n);
     expect(expiredState.available).to.equal(usd(100) - usd(100) / 200n);
-    expect(await game.requestToPlayer(requestId)).to.equal(ethers.ZeroAddress);
-    expect(await game.bankroll()).to.equal(INITIAL_BANKROLL);
+    expect(expiredState.bankroll).to.equal(INITIAL_BANKROLL);
 
     const beforeLateCallback = await game.getPlayerState(alice.address);
     await coordinator.fulfillRandomWords(requestId, [encodeDice(6, 1)]);

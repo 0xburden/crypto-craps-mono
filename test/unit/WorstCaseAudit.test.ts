@@ -40,7 +40,22 @@ describe("WorstCaseAudit", function () {
   });
 
   it("reserves the full 19.6k worst-case amount on a live roll request", async function () {
-    const { owner, alice, game } = await loadFixture(deployGameFixture);
+    const [owner, alice] = await ethers.getSigners();
+    const tokenFactory = await ethers.getContractFactory("MockERC20");
+    const coordinatorFactory = await ethers.getContractFactory("MockVRFCoordinator");
+    const gameFactory = await ethers.getContractFactory("CrapsGameWorstCaseHarness");
+
+    const token = await tokenFactory.deploy("Mock USDC", "mUSDC");
+    const coordinator = await coordinatorFactory.deploy();
+    const game = await gameFactory.deploy(await token.getAddress(), await coordinator.getAddress(), true);
+
+    await token.connect(owner).mint(owner.address, usd(1_000_000));
+    await token.connect(alice).mint(alice.address, usd(1_000_000));
+    await token.connect(owner).approve(await game.getAddress(), ethers.MaxUint256);
+    await token.connect(alice).approve(await game.getAddress(), ethers.MaxUint256);
+
+    await coordinator.createSubscription();
+    await coordinator.addConsumer(1, await game.getAddress());
 
     await game.connect(owner).fundBankroll(usd(100_000));
     await game.connect(alice).deposit(usd(20_000));

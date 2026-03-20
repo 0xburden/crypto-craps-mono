@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 
-import { BetType, PuckState, SessionPhase, deployGameFixture, rollAndFulfill, usd } from "./helpers/gameFixture";
+import { BetType, PuckState, SessionPhase, assertInvariant, deployGameFixture, rollAndFulfill, usd } from "./helpers/gameFixture";
 
 describe("GameCore", function () {
   it("resolves a come-out natural with Pass Line winning and Don't Pass losing", async function () {
@@ -24,9 +24,9 @@ describe("GameCore", function () {
     expect(state.reserved).to.equal(0n);
     expect(state.bets.passLine.amount).to.equal(0n);
     expect(state.bets.dontPass.amount).to.equal(0n);
-    expect(await game.bankroll()).to.equal(usd(20_000));
+    expect(state.bankroll).to.equal(usd(20_000));
 
-    await game.exposedAssertInvariant();
+    await assertInvariant(game, [alice]);
   });
 
   it("resolves come-out craps with Pass Line losing, Don't Pass winning on 2/3, and pushing on 12", async function () {
@@ -59,7 +59,7 @@ describe("GameCore", function () {
     expect(state.bets.dontPass.amount).to.equal(usd(10));
     expect(state.bets.dontPass.point).to.equal(0n);
 
-    await game.exposedAssertInvariant();
+    await assertInvariant(game, [alice]);
   });
 
   it("establishes a point and then pays Pass Line when the point is hit", async function () {
@@ -90,7 +90,7 @@ describe("GameCore", function () {
     expect(state.inPlay).to.equal(0n);
     expect(state.bets.passLine.amount).to.equal(0n);
 
-    await game.exposedAssertInvariant();
+    await assertInvariant(game, [alice]);
   });
 
   it("seven-out during the point phase makes Pass Line lose and Don't Pass win", async function () {
@@ -119,7 +119,7 @@ describe("GameCore", function () {
     expect(state.bets.passLine.amount).to.equal(0n);
     expect(state.bets.dontPass.amount).to.equal(0n);
 
-    await game.exposedAssertInvariant();
+    await assertInvariant(game, [alice]);
   });
 
   it("resolves Field wins, double wins on 2/12, and losses on 5/6/7/8", async function () {
@@ -168,17 +168,17 @@ describe("GameCore", function () {
     let state = await game.getPlayerState(alice.address);
     expect(state.phase).to.equal(SessionPhase.ROLL_PENDING);
     expect(state.reserved).to.equal(usd(20));
-    expect(await game.bankroll()).to.equal(usd(19_980));
+    expect(state.bankroll).to.equal(usd(19_980));
 
     await coordinator.fulfillRandomWords(state.pendingRequestId, [0n]);
 
     state = await game.getPlayerState(alice.address);
     expect(state.phase).to.equal(SessionPhase.COME_OUT);
     expect(state.reserved).to.equal(0n);
-    expect(await game.bankroll()).to.equal(usd(19_980));
+    expect(state.bankroll).to.equal(usd(19_980));
     expect(state.available).to.equal(usd(119_5) / 10n);
 
-    await game.exposedAssertInvariant();
+    await assertInvariant(game, [alice]);
   });
 
   it("reverts rollDice with InsufficientBankroll when the reserve requirement exceeds bankroll", async function () {

@@ -138,7 +138,7 @@ describe("Integration: solvency and exclusion flows", function () {
 
     await expect(game.connect(alice).requestSelfReinstatement()).to.emit(game, "SelfReinstatementRequested");
 
-    const eligibleAt = await game.reinstatementEligibleAt(alice.address);
+    const eligibleAt = (await game.getPlayerState(alice.address)).reinstatementEligibleAt;
     await time.increaseTo(eligibleAt);
 
     await expect(game.connect(alice).completeSelfReinstatement())

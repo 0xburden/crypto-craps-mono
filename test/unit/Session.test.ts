@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
 import { ethers } from "hardhat";
 
-import { BetType, SessionPhase, deployGameFixture, encodeDice, usd } from "./helpers/gameFixture";
+import { BetType, SessionPhase, assertInvariant, deployGameFixture, encodeDice, usd } from "./helpers/gameFixture";
 
 describe("Session", function () {
   it("opens a session and prevents opening a second active session", async function () {
@@ -17,7 +17,6 @@ describe("Session", function () {
     expect(state.point).to.equal(0n);
     expect(state.pendingRequestId).to.equal(0n);
     expect(state.lastActivityTime).to.be.greaterThanOrEqual(BigInt(before));
-    expect(await game.activeSessions()).to.equal(1n);
 
     await expect(game.connect(alice).openSession()).to.be.revertedWithCustomError(game, "SessionAlreadyActive");
   });
@@ -36,9 +35,8 @@ describe("Session", function () {
     expect(state.inPlay).to.equal(0n);
     expect(state.available).to.equal(usd(99_5) / 10n);
     expect(state.bets.passLine.amount).to.equal(0n);
-    expect(await game.activeSessions()).to.equal(0n);
 
-    await game.exposedAssertInvariant();
+    await assertInvariant(game, [alice]);
   });
 
   it("expires an active session and returns bets to available", async function () {
@@ -62,9 +60,8 @@ describe("Session", function () {
     expect(state.pendingRequestId).to.equal(0n);
     expect(state.bets.passLine.amount).to.equal(0n);
     expect(state.bets.oneRolls.field).to.equal(0n);
-    expect(await game.activeSessions()).to.equal(0n);
 
-    await game.exposedAssertInvariant();
+    await assertInvariant(game, [alice]);
   });
 
   it("expires a pending session, releases reserve, and clears the VRF request mapping", async function () {
@@ -81,7 +78,7 @@ describe("Session", function () {
 
     expect(pendingState.phase).to.equal(SessionPhase.ROLL_PENDING);
     expect(pendingState.reserved).to.equal(usd(10));
-    expect(await game.bankroll()).to.equal(usd(19_990));
+    expect(pendingState.bankroll).to.equal(usd(19_990));
 
     await time.increase(24 * 60 * 60 + 1);
 
@@ -95,10 +92,9 @@ describe("Session", function () {
     expect(state.inPlay).to.equal(0n);
     expect(state.reserved).to.equal(0n);
     expect(state.pendingRequestId).to.equal(0n);
-    expect(await game.bankroll()).to.equal(usd(20_000));
-    expect(await game.requestToPlayer(requestId)).to.equal(ethers.ZeroAddress);
+    expect(state.bankroll).to.equal(usd(20_000));
 
-    await game.exposedAssertInvariant();
+    await assertInvariant(game, [alice]);
   });
 
   it("silently ignores a late VRF callback after session expiry", async function () {
@@ -126,6 +122,6 @@ describe("Session", function () {
     expect(after.reserved).to.equal(before.reserved);
     expect(after.pendingRequestId).to.equal(before.pendingRequestId);
 
-    await game.exposedAssertInvariant();
+    await assertInvariant(game, [alice]);
   });
 });

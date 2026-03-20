@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 
-import { BetType, SessionPhase, deployGameFixture, rollAndFulfill, usd } from "./helpers/gameFixture";
+import { BetType, SessionPhase, assertInvariant, deployGameFixture, rollAndFulfill, usd } from "./helpers/gameFixture";
 
 const POINT_DICE: Record<number, [number, number]> = {
   4: [1, 3],
@@ -74,7 +74,7 @@ describe("PlaceBets", function () {
       if (betType === BetType.PLACE_9) expect(state.bets.place9.amount).to.equal(amount);
       if (betType === BetType.PLACE_10) expect(state.bets.place10.amount).to.equal(amount);
 
-      await game.exposedAssertInvariant();
+      await assertInvariant(game, [alice]);
     }
   });
 

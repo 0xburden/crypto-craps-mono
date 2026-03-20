@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
 
-import { BetType, SessionPhase, deployGameFixture, usd } from "./helpers/gameFixture";
+import { BetType, SessionPhase, assertInvariant, deployGameFixture, usd } from "./helpers/gameFixture";
 
 describe("Exclusion", function () {
   it("self-excludes immediately, expires any active session, and still allows withdrawal", async function () {
@@ -26,7 +26,7 @@ describe("Exclusion", function () {
     await expect(game.connect(alice).withdraw(usd(20))).to.emit(game, "Withdrawal").withArgs(alice.address, usd(20));
     expect(await token.balanceOf(alice.address)).to.equal(balanceBefore + usd(20));
 
-    await game.exposedAssertInvariant();
+    await assertInvariant(game, [alice]);
   });
 
   it("supports the self-reinstatement delay flow", async function () {
@@ -36,7 +36,8 @@ describe("Exclusion", function () {
 
     await expect(game.connect(alice).requestSelfReinstatement()).to.emit(game, "SelfReinstatementRequested");
 
-    const eligibleAt = await game.reinstatementEligibleAt(alice.address);
+    const requestedState = await game.getPlayerState(alice.address);
+    const eligibleAt = requestedState.reinstatementEligibleAt;
     expect(eligibleAt).to.be.greaterThan(0n);
 
     await expect(game.connect(alice).completeSelfReinstatement()).to.be.revertedWithCustomError(
@@ -95,14 +96,14 @@ describe("Exclusion", function () {
     await game.connect(alice).selfExclude();
     await game.connect(alice).requestSelfReinstatement();
 
-    const firstEligibleAt = await game.reinstatementEligibleAt(alice.address);
+    const firstEligibleAt = (await game.getPlayerState(alice.address)).reinstatementEligibleAt;
     await time.increase(24 * 60 * 60);
 
     await game.connect(alice).selfExclude();
-    expect(await game.reinstatementEligibleAt(alice.address)).to.equal(0n);
+    expect((await game.getPlayerState(alice.address)).reinstatementEligibleAt).to.equal(0n);
 
     await game.connect(alice).requestSelfReinstatement();
-    const secondEligibleAt = await game.reinstatementEligibleAt(alice.address);
+    const secondEligibleAt = (await game.getPlayerState(alice.address)).reinstatementEligibleAt;
 
     expect(secondEligibleAt).to.be.greaterThan(firstEligibleAt);
   });

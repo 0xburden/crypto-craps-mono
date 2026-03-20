@@ -143,7 +143,6 @@ interface ICrapsGame {
     event BankrollWithdrawn(address indexed to, uint256 amount);
 
     function token() external view returns (address);
-    function vrfCoordinator() external view returns (address);
 
     function deposit(uint256 amount) external;
     function withdraw(uint256 amount) external;

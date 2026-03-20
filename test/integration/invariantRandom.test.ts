@@ -79,8 +79,7 @@ async function assertFiveBucketInvariant(
   players: Array<Awaited<ReturnType<typeof ethers.getSigners>>[number]>
 ) {
   const contractBalance = await token.balanceOf(await game.getAddress());
-  const bankroll = await game.bankroll();
-  const accruedFees = await game.accruedFees();
+  const houseState = await game.getPlayerState(players[0].address);
 
   let sum = 0n;
   for (const player of players) {
@@ -88,7 +87,7 @@ async function assertFiveBucketInvariant(
     sum += state.available + state.inPlay + state.reserved;
   }
 
-  expect(contractBalance).to.equal(sum + bankroll + accruedFees);
+  expect(contractBalance).to.equal(sum + houseState.bankroll + houseState.accruedFees);
 }
 
 async function expireAnyExpiredSessions(
@@ -144,7 +143,7 @@ describe("Integration / invariant random", function () {
         await assertFiveBucketInvariant(game, token, players);
       }
 
-      const bankroll = await game.bankroll();
+      const bankroll = (await game.getPlayerState(owner.address)).bankroll;
       if (bankroll < BANKROLL_TOP_UP_THRESHOLD) {
         const topUpAmount = BANKROLL_TOP_UP_TARGET - bankroll;
         await game.connect(owner).fundBankroll(topUpAmount);
@@ -152,7 +151,7 @@ describe("Integration / invariant random", function () {
         continue;
       }
 
-      const accruedFees = await game.accruedFees();
+      const accruedFees = (await game.getPlayerState(owner.address)).accruedFees;
       if (accruedFees >= usd(100)) {
         await game.connect(owner).withdrawFees(owner.address);
         await assertFiveBucketInvariant(game, token, players);

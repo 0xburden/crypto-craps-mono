@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 
-import { BetType, SessionPhase, deployGameFixture, rollAndFulfill, usd } from "./helpers/gameFixture";
+import { BetType, SessionPhase, assertInvariant, deployGameFixture, rollAndFulfill, usd } from "./helpers/gameFixture";
 
 const POINT_DICE: Record<number, [number, number]> = {
   4: [1, 3],
@@ -89,7 +89,7 @@ describe("OddsBets", function () {
       expect(state.inPlay).to.equal(0n);
       expect(state.reserved).to.equal(0n);
 
-      await game.exposedAssertInvariant();
+      await assertInvariant(game, [alice]);
     }
   });
 
@@ -109,7 +109,7 @@ describe("OddsBets", function () {
       expect(state.inPlay).to.equal(0n);
       expect(state.reserved).to.equal(0n);
 
-      await game.exposedAssertInvariant();
+      await assertInvariant(game, [alice]);
     }
   });
 

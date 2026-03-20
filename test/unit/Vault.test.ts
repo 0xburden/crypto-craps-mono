@@ -22,7 +22,7 @@ describe("Vault", function () {
 
     const tokenFactory = await ethers.getContractFactory("MockERC20");
     const coordinatorFactory = await ethers.getContractFactory("MockVRFCoordinator");
-    const gameFactory = await ethers.getContractFactory("CrapsGameHarness");
+    const gameFactory = await ethers.getContractFactory("CrapsGameVaultHarness");
 
     const token = await tokenFactory.deploy("Mock USDC", "mUSDC");
     const coordinator = await coordinatorFactory.deploy();
@@ -47,13 +47,14 @@ describe("Vault", function () {
       .to.emit(game, "Deposit")
       .withArgs(alice.address, amount, fee);
 
-    expect(await game.availableBalanceOf(alice.address)).to.equal(amount - fee);
-    expect(await game.inPlayBalanceOf(alice.address)).to.equal(0n);
-    expect(await game.reservedBalanceOf(alice.address)).to.equal(0n);
-    expect(await game.totalAvailable()).to.equal(amount - fee);
-    expect(await game.totalInPlay()).to.equal(0n);
-    expect(await game.totalReserved()).to.equal(0n);
-    expect(await game.accruedFees()).to.equal(fee);
+    const depositedState = await game.getPlayerState(alice.address);
+    expect(depositedState.available).to.equal(amount - fee);
+    expect(depositedState.inPlay).to.equal(0n);
+    expect(depositedState.reserved).to.equal(0n);
+    expect(depositedState.available).to.equal(amount - fee);
+    expect(depositedState.inPlay).to.equal(0n);
+    expect(depositedState.reserved).to.equal(0n);
+    expect(depositedState.accruedFees).to.equal(fee);
     expect(await token.balanceOf(await game.getAddress())).to.equal(amount);
 
     await game.exposedAssertInvariant();
@@ -81,14 +82,14 @@ describe("Vault", function () {
       .to.emit(game, "Withdrawal")
       .withArgs(alice.address, usd(400));
 
-    expect(await game.availableBalanceOf(alice.address)).to.equal(net - usd(400));
+    expect((await game.getPlayerState(alice.address)).available).to.equal(net - usd(400));
     expect(await token.balanceOf(await game.getAddress())).to.equal(depositAmount - usd(400));
     await game.exposedAssertInvariant();
 
     await game.connect(alice).withdraw(net - usd(400));
 
-    expect(await game.availableBalanceOf(alice.address)).to.equal(0n);
-    expect(await game.totalAvailable()).to.equal(0n);
+    const emptiedState = await game.getPlayerState(alice.address);
+    expect(emptiedState.available).to.equal(0n);
     expect(await token.balanceOf(await game.getAddress())).to.equal(fee);
     await game.exposedAssertInvariant();
   });
@@ -103,7 +104,7 @@ describe("Vault", function () {
     await game.connect(owner).pause();
 
     await expect(game.connect(alice).withdraw(usd(50))).to.not.be.reverted;
-    expect(await game.availableBalanceOf(alice.address)).to.equal(usd(49_5) / 10n);
+    expect((await game.getPlayerState(alice.address)).available).to.equal(usd(49_5) / 10n);
     await game.exposedAssertInvariant();
   });
 
@@ -113,16 +114,18 @@ describe("Vault", function () {
     await game.connect(alice).deposit(usd(1_000));
 
     await game.exposedDebitAvailable(alice.address, usd(125));
-    expect(await game.availableBalanceOf(alice.address)).to.equal(usd(870));
-    expect(await game.inPlayBalanceOf(alice.address)).to.equal(usd(125));
-    expect(await game.totalAvailable()).to.equal(usd(870));
-    expect(await game.totalInPlay()).to.equal(usd(125));
+    let state = await game.getPlayerState(alice.address);
+    expect(state.available).to.equal(usd(870));
+    expect(state.inPlay).to.equal(usd(125));
+    expect(state.available).to.equal(usd(870));
+    expect(state.inPlay).to.equal(usd(125));
 
     await game.exposedCreditAvailable(alice.address, usd(75));
-    expect(await game.availableBalanceOf(alice.address)).to.equal(usd(945));
-    expect(await game.inPlayBalanceOf(alice.address)).to.equal(usd(50));
-    expect(await game.totalAvailable()).to.equal(usd(945));
-    expect(await game.totalInPlay()).to.equal(usd(50));
+    state = await game.getPlayerState(alice.address);
+    expect(state.available).to.equal(usd(945));
+    expect(state.inPlay).to.equal(usd(50));
+    expect(state.available).to.equal(usd(945));
+    expect(state.inPlay).to.equal(usd(50));
 
     await game.exposedAssertInvariant();
   });
@@ -134,26 +137,29 @@ describe("Vault", function () {
     await game.connect(owner).fundBankroll(bankrollAmount);
 
     await game.exposedReserveFromBankroll(alice.address, usd(1_000));
-    expect(await game.bankroll()).to.equal(bankrollAmount - usd(1_000));
-    expect(await game.reservedBalanceOf(alice.address)).to.equal(usd(1_000));
-    expect(await game.totalReserved()).to.equal(usd(1_000));
+    let state = await game.getPlayerState(alice.address);
+    expect(state.bankroll).to.equal(bankrollAmount - usd(1_000));
+    expect(state.reserved).to.equal(usd(1_000));
 
     await game.exposedReleaseReserve(alice.address, 0);
-    expect(await game.bankroll()).to.equal(bankrollAmount);
-    expect(await game.reservedBalanceOf(alice.address)).to.equal(0n);
-    expect(await game.availableBalanceOf(alice.address)).to.equal(0n);
+    state = await game.getPlayerState(alice.address);
+    expect(state.bankroll).to.equal(bankrollAmount);
+    expect(state.reserved).to.equal(0n);
+    expect(state.available).to.equal(0n);
 
     await game.exposedReserveFromBankroll(alice.address, usd(1_000));
     await game.exposedReleaseReserve(alice.address, usd(250));
-    expect(await game.bankroll()).to.equal(bankrollAmount - usd(250));
-    expect(await game.availableBalanceOf(alice.address)).to.equal(usd(250));
-    expect(await game.reservedBalanceOf(alice.address)).to.equal(0n);
+    state = await game.getPlayerState(alice.address);
+    expect(state.bankroll).to.equal(bankrollAmount - usd(250));
+    expect(state.available).to.equal(usd(250));
+    expect(state.reserved).to.equal(0n);
 
     await game.exposedReserveFromBankroll(alice.address, usd(1_000));
     await game.exposedReleaseReserve(alice.address, usd(1_000));
-    expect(await game.bankroll()).to.equal(bankrollAmount - usd(1_250));
-    expect(await game.availableBalanceOf(alice.address)).to.equal(usd(1_250));
-    expect(await game.totalReserved()).to.equal(0n);
+    state = await game.getPlayerState(alice.address);
+    expect(state.bankroll).to.equal(bankrollAmount - usd(1_250));
+    expect(state.available).to.equal(usd(1_250));
+    expect(state.reserved).to.equal(0n);
 
     await game.exposedAssertInvariant();
   });
@@ -172,7 +178,7 @@ describe("Vault", function () {
       .to.emit(game, "FeesWithdrawn")
       .withArgs(treasury.address, expectedFees);
 
-    expect(await game.accruedFees()).to.equal(0n);
+    expect((await game.getPlayerState(alice.address)).accruedFees).to.equal(0n);
     expect(await token.balanceOf(treasury.address)).to.equal(expectedFees);
     await game.exposedAssertInvariant();
   });
@@ -189,7 +195,7 @@ describe("Vault", function () {
       .to.emit(game, "FeesWithdrawn")
       .withArgs(treasury.address, expectedFees);
 
-    expect(await game.accruedFees()).to.equal(0n);
+    expect((await game.getPlayerState(alice.address)).accruedFees).to.equal(0n);
     expect(await token.balanceOf(treasury.address)).to.equal(expectedFees);
     await game.exposedAssertInvariant();
   });
@@ -202,11 +208,12 @@ describe("Vault", function () {
       .to.emit(game, "BankrollFunded")
       .withArgs(owner.address, amount);
 
-    expect(await game.bankroll()).to.equal(amount);
+    const state = await game.getPlayerState(owner.address);
+    expect(state.bankroll).to.equal(amount);
     expect(await token.balanceOf(await game.getAddress())).to.equal(amount);
-    expect(await game.totalAvailable()).to.equal(0n);
-    expect(await game.totalInPlay()).to.equal(0n);
-    expect(await game.totalReserved()).to.equal(0n);
+    expect(state.available).to.equal(0n);
+    expect(state.inPlay).to.equal(0n);
+    expect(state.reserved).to.equal(0n);
     await game.exposedAssertInvariant();
   });
 
@@ -235,7 +242,7 @@ describe("Vault", function () {
       .to.emit(game, "BankrollWithdrawn")
       .withArgs(owner.address, withdrawn);
 
-    expect(await game.bankroll()).to.equal(funded - withdrawn);
+    expect((await game.getPlayerState(owner.address)).bankroll).to.equal(funded - withdrawn);
     expect(await token.balanceOf(await game.getAddress())).to.equal(funded - withdrawn);
     await game.exposedAssertInvariant();
   });
@@ -296,11 +303,17 @@ describe("Vault", function () {
     await game.exposedReserveFromBankroll(carol.address, usd(150));
     await game.exposedReleaseReserve(carol.address, usd(25));
 
-    expect(await game.totalAvailable()).to.equal(usd(161_625) / 100n);
-    expect(await game.totalInPlay()).to.equal(usd(150));
-    expect(await game.totalReserved()).to.equal(usd(300));
-    expect(await game.bankroll()).to.equal(usd(19_675));
-    expect(await game.accruedFees()).to.equal(usd(875) / 100n);
+    const [aliceState, bobState, carolState] = await Promise.all([
+      game.getPlayerState(alice.address),
+      game.getPlayerState(bob.address),
+      game.getPlayerState(carol.address)
+    ]);
+
+    expect(aliceState.available + bobState.available + carolState.available).to.equal(usd(161_625) / 100n);
+    expect(aliceState.inPlay + bobState.inPlay + carolState.inPlay).to.equal(usd(150));
+    expect(aliceState.reserved + bobState.reserved + carolState.reserved).to.equal(usd(300));
+    expect(aliceState.bankroll).to.equal(usd(19_675));
+    expect(aliceState.accruedFees).to.equal(usd(875) / 100n);
 
     await game.exposedAssertInvariant();
   });
@@ -338,7 +351,7 @@ describe("Vault", function () {
     const [owner, alice] = await ethers.getSigners();
     const tokenFactory = await ethers.getContractFactory("MockERC20");
     const coordinatorFactory = await ethers.getContractFactory("MockVRFCoordinator");
-    const gameFactory = await ethers.getContractFactory("CrapsGameHarness");
+    const gameFactory = await ethers.getContractFactory("CrapsGameVaultHarness");
 
     const token = await tokenFactory.deploy("Mock USDC", "mUSDC");
     const coordinator = await coordinatorFactory.deploy();
@@ -349,8 +362,7 @@ describe("Vault", function () {
 
     await game.connect(alice).deposit(usd(100));
 
-    expect(await game.DEBUG()).to.equal(false);
-    expect(await game.availableBalanceOf(alice.address)).to.equal(usd(99_5) / 10n);
+    expect((await game.getPlayerState(alice.address)).available).to.equal(usd(99_5) / 10n);
   });
 
   it("routes phase 4 entrypoints through live validation instead of placeholder reverts", async function () {
@@ -412,9 +424,9 @@ describe("Vault", function () {
       }
 
       for (const signer of players) {
-        expect(await game.availableBalanceOf(signer.address)).to.equal(available.get(signer.address));
+        expect((await game.getPlayerState(signer.address)).available).to.equal(available.get(signer.address));
       }
-      expect(await game.accruedFees()).to.equal(expectedFees);
+      expect((await game.getPlayerState(players[0].address)).accruedFees).to.equal(expectedFees);
       await game.exposedAssertInvariant();
     }
   });

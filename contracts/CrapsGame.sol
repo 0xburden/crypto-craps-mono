@@ -13,35 +13,35 @@ import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/V
 contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    uint16 public constant DEPOSIT_FEE_BPS = 50;
-    uint256 public constant MIN_BANKROLL = 10_000e6;
-    uint256 public constant INITIAL_BANKROLL = 50_000e6;
+    uint16 internal constant DEPOSIT_FEE_BPS = 50;
+    uint256 internal constant MIN_BANKROLL = 10_000e6;
+    uint256 internal constant INITIAL_BANKROLL = 50_000e6;
 
-    uint32 public constant CALLBACK_GAS_LIMIT = 500_000;
-    uint16 public constant REQUEST_CONFIRMATIONS = 3;
-    uint32 public constant NUM_WORDS = 1;
-    uint256 public constant SESSION_TIMEOUT = 24 hours;
-    uint256 public constant VRF_TIMEOUT_BLOCKS = 100;
-    uint256 public constant SELF_EXCLUSION_DELAY = 7 days;
+    uint32 internal constant CALLBACK_GAS_LIMIT = 500_000;
+    uint16 internal constant REQUEST_CONFIRMATIONS = 3;
+    uint32 internal constant NUM_WORDS = 1;
+    uint256 internal constant SESSION_TIMEOUT = 24 hours;
+    uint256 internal constant VRF_TIMEOUT_BLOCKS = 100;
+    uint256 internal constant SELF_EXCLUSION_DELAY = 7 days;
 
-    uint256 public constant MIN_LINE_BET = 1e6;
-    uint256 public constant MAX_LINE_BET = 500e6;
-    uint256 public constant MAX_ODDS_MULTIPLIER = 3;
-    uint256 public constant MIN_FIELD_BET = 1e6;
-    uint256 public constant MAX_FIELD_BET = 500e6;
-    uint256 public constant MIN_PLACE_BET = 5e6;
-    uint256 public constant MIN_PLACE_6_8_BET = 6e6;
-    uint256 public constant MAX_PLACE_BET = 500e6;
-    uint256 public constant MIN_PROP_BET = 1e6;
-    uint256 public constant MAX_PROP_BET = 100e6;
-    uint256 public constant MIN_HARDWAY_BET = 1e6;
-    uint256 public constant MAX_HARDWAY_BET = 100e6;
-    uint256 public constant MIN_HORN_BET = 4e6;
+    uint256 internal constant MIN_LINE_BET = 1e6;
+    uint256 internal constant MAX_LINE_BET = 500e6;
+    uint256 internal constant MAX_ODDS_MULTIPLIER = 3;
+    uint256 internal constant MIN_FIELD_BET = 1e6;
+    uint256 internal constant MAX_FIELD_BET = 500e6;
+    uint256 internal constant MIN_PLACE_BET = 5e6;
+    uint256 internal constant MIN_PLACE_6_8_BET = 6e6;
+    uint256 internal constant MAX_PLACE_BET = 500e6;
+    uint256 internal constant MIN_PROP_BET = 1e6;
+    uint256 internal constant MAX_PROP_BET = 100e6;
+    uint256 internal constant MIN_HARDWAY_BET = 1e6;
+    uint256 internal constant MAX_HARDWAY_BET = 100e6;
+    uint256 internal constant MIN_HORN_BET = 4e6;
 
     IERC20 private immutable i_token;
-    uint256 public immutable vrfSubscriptionId;
-    bytes32 public immutable vrfKeyHash;
-    bool public immutable DEBUG;
+    uint256 internal immutable vrfSubscriptionId;
+    bytes32 internal immutable vrfKeyHash;
+    bool internal immutable DEBUG;
 
     struct SessionData {
         SessionPhase phase;
@@ -56,21 +56,21 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
     mapping(address player => uint256 amount) internal _reserved;
     mapping(address player => SessionData session) internal _sessions;
 
-    mapping(uint256 requestId => address player) public requestToPlayer;
-    mapping(address player => bool excluded) public selfExcluded;
-    mapping(address player => bool excluded) public operatorExcluded;
-    mapping(address player => uint256 eligibleAt) public reinstatementEligibleAt;
+    mapping(uint256 requestId => address player) internal requestToPlayer;
+    mapping(address player => bool excluded) internal selfExcluded;
+    mapping(address player => bool excluded) internal operatorExcluded;
+    mapping(address player => uint256 eligibleAt) internal reinstatementEligibleAt;
     mapping(address player => bool tracked) private _isTrackedPlayer;
 
     address[] private _trackedPlayers;
 
-    uint256 public totalAvailable;
-    uint256 public totalInPlay;
-    uint256 public totalReserved;
-    uint256 public bankroll;
-    uint256 public accruedFees;
-    uint256 public pendingVRFRequests;
-    uint256 public activeSessions;
+    uint256 internal totalAvailable;
+    uint256 internal totalInPlay;
+    uint256 internal totalReserved;
+    uint256 internal bankroll;
+    uint256 internal accruedFees;
+    uint256 internal pendingVRFRequests;
+    uint256 internal activeSessions;
 
     modifier notExcluded() {
         if (_isExcluded(msg.sender)) revert PlayerExcluded(msg.sender);
@@ -94,22 +94,6 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
 
     function token() external view override returns (address) {
         return address(i_token);
-    }
-
-    function vrfCoordinator() external view override returns (address) {
-        return address(s_vrfCoordinator);
-    }
-
-    function availableBalanceOf(address player) external view returns (uint256) {
-        return _available[player];
-    }
-
-    function inPlayBalanceOf(address player) external view returns (uint256) {
-        return _inPlay[player];
-    }
-
-    function reservedBalanceOf(address player) external view returns (uint256) {
-        return _reserved[player];
     }
 
     function deposit(uint256 amount) external override whenNotPaused notExcluded nonReentrant {
@@ -302,91 +286,32 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
         PuckState puckState = _puckState(session.point);
 
         if (betType == BetType.PASS_LINE) {
-            if (puckState != PuckState.OFF) revert BetUnavailable(betType, puckState);
-            _validateSingleBetAmount(amount, MIN_LINE_BET, MAX_LINE_BET, 1);
-            if (session.bets.passLine.amount != 0) revert InvalidAmount(amount);
-
-            _debitAvailable(msg.sender, amount);
-            session.bets.passLine.amount = amount;
-            session.bets.passLine.oddsAmount = 0;
-            session.bets.passLine.point = 0;
-
-            emit BetPlaced(msg.sender, betType, amount);
+            _placeLineBet(session.bets.passLine, betType, puckState, amount);
             return;
         }
 
         if (betType == BetType.DONT_PASS) {
-            if (puckState != PuckState.OFF) revert BetUnavailable(betType, puckState);
-            _validateSingleBetAmount(amount, MIN_LINE_BET, MAX_LINE_BET, 1);
-            if (session.bets.dontPass.amount != 0) revert InvalidAmount(amount);
-
-            _debitAvailable(msg.sender, amount);
-            session.bets.dontPass.amount = amount;
-            session.bets.dontPass.oddsAmount = 0;
-            session.bets.dontPass.point = 0;
-
-            emit BetPlaced(msg.sender, betType, amount);
+            _placeLineBet(session.bets.dontPass, betType, puckState, amount);
             return;
         }
 
         if (betType == BetType.PASS_LINE_ODDS) {
-            if (puckState != PuckState.ON) revert BetUnavailable(betType, puckState);
-            if (session.bets.passLine.amount == 0) revert NoActiveBet(BetType.PASS_LINE);
-
-            _validateOddsAmount(
-                amount,
-                session.bets.passLine.amount,
-                session.point,
-                session.bets.passLine.oddsAmount + amount,
-                betType
-            );
-
-            _debitAvailable(msg.sender, amount);
-            session.bets.passLine.oddsAmount += amount;
-
-            emit BetPlaced(msg.sender, betType, amount);
+            _placeOddsBet(session.bets.passLine, BetType.PASS_LINE, betType, puckState, session.point, amount);
             return;
         }
 
         if (betType == BetType.DONT_PASS_ODDS) {
-            if (puckState != PuckState.ON) revert BetUnavailable(betType, puckState);
-            if (session.bets.dontPass.amount == 0) revert NoActiveBet(BetType.DONT_PASS);
-
-            _validateOddsAmount(
-                amount,
-                session.bets.dontPass.amount,
-                session.point,
-                session.bets.dontPass.oddsAmount + amount,
-                betType
-            );
-
-            _debitAvailable(msg.sender, amount);
-            session.bets.dontPass.oddsAmount += amount;
-
-            emit BetPlaced(msg.sender, betType, amount);
+            _placeOddsBet(session.bets.dontPass, BetType.DONT_PASS, betType, puckState, session.point, amount);
             return;
         }
 
-        if (betType == BetType.COME || betType == BetType.DONT_COME) {
-            if (puckState != PuckState.ON) revert BetUnavailable(betType, puckState);
-            _validateSingleBetAmount(amount, MIN_LINE_BET, MAX_LINE_BET, 1);
+        if (betType == BetType.COME) {
+            _placeComeTravelBet(session.bets.come, betType, puckState, amount);
+            return;
+        }
 
-            uint8 slotIndex = _findOpenLineBetSlot(betType == BetType.COME ? session.bets.come : session.bets.dontCome);
-            if (slotIndex >= 4) revert InvalidIndex(slotIndex);
-
-            _debitAvailable(msg.sender, amount);
-
-            if (betType == BetType.COME) {
-                session.bets.come[slotIndex].amount = amount;
-                session.bets.come[slotIndex].oddsAmount = 0;
-                session.bets.come[slotIndex].point = 0;
-            } else {
-                session.bets.dontCome[slotIndex].amount = amount;
-                session.bets.dontCome[slotIndex].oddsAmount = 0;
-                session.bets.dontCome[slotIndex].point = 0;
-            }
-
-            emit BetPlaced(msg.sender, betType, amount);
+        if (betType == BetType.DONT_COME) {
+            _placeComeTravelBet(session.bets.dontCome, betType, puckState, amount);
             return;
         }
 
@@ -489,24 +414,14 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
         if (betType == BetType.COME_ODDS) {
             Bet storage comeBet = session.bets.come[index];
             if (comeBet.amount == 0 || comeBet.point == 0) revert NoActiveBet(BetType.COME);
-
-            _validateOddsAmount(amount, comeBet.amount, comeBet.point, comeBet.oddsAmount + amount, betType);
-            _debitAvailable(msg.sender, amount);
-            comeBet.oddsAmount += amount;
-
-            emit BetPlaced(msg.sender, betType, amount);
+            _placeOddsBet(comeBet, BetType.COME, betType, PuckState.ON, comeBet.point, amount);
             return;
         }
 
         if (betType == BetType.DONT_COME_ODDS) {
             Bet storage dontComeBet = session.bets.dontCome[index];
             if (dontComeBet.amount == 0 || dontComeBet.point == 0) revert NoActiveBet(BetType.DONT_COME);
-
-            _validateOddsAmount(amount, dontComeBet.amount, dontComeBet.point, dontComeBet.oddsAmount + amount, betType);
-            _debitAvailable(msg.sender, amount);
-            dontComeBet.oddsAmount += amount;
-
-            emit BetPlaced(msg.sender, betType, amount);
+            _placeOddsBet(dontComeBet, BetType.DONT_COME, betType, PuckState.ON, dontComeBet.point, amount);
             return;
         }
 
@@ -519,49 +434,23 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
         SessionData storage session = _sessions[msg.sender];
         _requireSessionReady(session);
 
-        uint256 returnedAmount;
-
         if (betType == BetType.DONT_PASS) {
-            returnedAmount = session.bets.dontPass.amount + session.bets.dontPass.oddsAmount;
-            if (returnedAmount == 0) revert NoActiveBet(BetType.DONT_PASS);
-
-            delete session.bets.dontPass;
-            _creditAvailable(msg.sender, returnedAmount);
-
-            emit BetRemoved(msg.sender, betType, returnedAmount);
+            _removeLineBetWithOdds(session.bets.dontPass, BetType.DONT_PASS);
             return;
         }
 
         if (betType == BetType.PASS_LINE_ODDS) {
-            returnedAmount = session.bets.passLine.oddsAmount;
-            if (returnedAmount == 0) revert NoActiveBet(BetType.PASS_LINE_ODDS);
-
-            session.bets.passLine.oddsAmount = 0;
-            _creditAvailable(msg.sender, returnedAmount);
-
-            emit BetRemoved(msg.sender, betType, returnedAmount);
+            _removeOddsBet(session.bets.passLine, BetType.PASS_LINE_ODDS);
             return;
         }
 
         if (betType == BetType.DONT_PASS_ODDS) {
-            returnedAmount = session.bets.dontPass.oddsAmount;
-            if (returnedAmount == 0) revert NoActiveBet(BetType.DONT_PASS_ODDS);
-
-            session.bets.dontPass.oddsAmount = 0;
-            _creditAvailable(msg.sender, returnedAmount);
-
-            emit BetRemoved(msg.sender, betType, returnedAmount);
+            _removeOddsBet(session.bets.dontPass, BetType.DONT_PASS_ODDS);
             return;
         }
 
         if (betType == BetType.FIELD) {
-            returnedAmount = session.bets.oneRolls.field;
-            if (returnedAmount == 0) revert NoActiveBet(betType);
-
-            session.bets.oneRolls.field = 0;
-            _creditAvailable(msg.sender, returnedAmount);
-
-            emit BetRemoved(msg.sender, betType, returnedAmount);
+            _removeOneRollBet(session.bets.oneRolls, betType);
             return;
         }
 
@@ -573,15 +462,7 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
             betType == BetType.PLACE_9 ||
             betType == BetType.PLACE_10
         ) {
-            PlaceBet storage placeSlot = _placeBetStorage(session.bets, betType);
-            returnedAmount = placeSlot.amount;
-            if (returnedAmount == 0) revert NoActiveBet(betType);
-
-            placeSlot.amount = 0;
-            placeSlot.working = false;
-            _creditAvailable(msg.sender, returnedAmount);
-
-            emit BetRemoved(msg.sender, betType, returnedAmount);
+            _removePlaceBet(_placeBetStorage(session.bets, betType), betType);
             return;
         }
 
@@ -591,14 +472,7 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
             betType == BetType.HARD_8 ||
             betType == BetType.HARD_10
         ) {
-            HardwayBet storage hardwayBet = _hardwayBetStorage(session.bets, betType);
-            returnedAmount = hardwayBet.amount;
-            if (returnedAmount == 0) revert NoActiveBet(betType);
-
-            hardwayBet.amount = 0;
-            _creditAvailable(msg.sender, returnedAmount);
-
-            emit BetRemoved(msg.sender, betType, returnedAmount);
+            _removeHardwayBet(_hardwayBetStorage(session.bets, betType), betType);
             return;
         }
 
@@ -611,13 +485,7 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
             betType == BetType.TWELVE ||
             betType == BetType.HORN
         ) {
-            returnedAmount = _oneRollBetAmount(session.bets.oneRolls, betType);
-            if (returnedAmount == 0) revert NoActiveBet(betType);
-
-            _setOneRollBetAmount(session.bets.oneRolls, betType, 0);
-            _creditAvailable(msg.sender, returnedAmount);
-
-            emit BetRemoved(msg.sender, betType, returnedAmount);
+            _removeOneRollBet(session.bets.oneRolls, betType);
             return;
         }
 
@@ -632,38 +500,18 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
 
         if (index >= 4) revert InvalidIndex(index);
 
-        uint256 returnedAmount;
-
         if (betType == BetType.DONT_COME) {
-            returnedAmount = session.bets.dontCome[index].amount + session.bets.dontCome[index].oddsAmount;
-            if (returnedAmount == 0) revert NoActiveBet(BetType.DONT_COME);
-
-            delete session.bets.dontCome[index];
-            _creditAvailable(msg.sender, returnedAmount);
-
-            emit BetRemoved(msg.sender, betType, returnedAmount);
+            _removeLineBetWithOdds(session.bets.dontCome[index], BetType.DONT_COME);
             return;
         }
 
         if (betType == BetType.COME_ODDS) {
-            returnedAmount = session.bets.come[index].oddsAmount;
-            if (returnedAmount == 0) revert NoActiveBet(BetType.COME_ODDS);
-
-            session.bets.come[index].oddsAmount = 0;
-            _creditAvailable(msg.sender, returnedAmount);
-
-            emit BetRemoved(msg.sender, betType, returnedAmount);
+            _removeOddsBet(session.bets.come[index], BetType.COME_ODDS);
             return;
         }
 
         if (betType == BetType.DONT_COME_ODDS) {
-            returnedAmount = session.bets.dontCome[index].oddsAmount;
-            if (returnedAmount == 0) revert NoActiveBet(BetType.DONT_COME_ODDS);
-
-            session.bets.dontCome[index].oddsAmount = 0;
-            _creditAvailable(msg.sender, returnedAmount);
-
-            emit BetRemoved(msg.sender, betType, returnedAmount);
+            _removeOddsBet(session.bets.dontCome[index], BetType.DONT_COME_ODDS);
             return;
         }
 
@@ -976,6 +824,103 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
         revert InvalidBetType(betType);
     }
 
+    function _placeLineBet(Bet storage lineBet, BetType betType, PuckState puckState, uint256 amount) internal {
+        if (puckState != PuckState.OFF) revert BetUnavailable(betType, puckState);
+        _validateSingleBetAmount(amount, MIN_LINE_BET, MAX_LINE_BET, 1);
+        if (lineBet.amount != 0) revert InvalidAmount(amount);
+
+        _debitAvailable(msg.sender, amount);
+        lineBet.amount = amount;
+        lineBet.oddsAmount = 0;
+        lineBet.point = 0;
+
+        emit BetPlaced(msg.sender, betType, amount);
+    }
+
+    function _placeOddsBet(
+        Bet storage lineBet,
+        BetType baseBetType,
+        BetType oddsBetType,
+        PuckState puckState,
+        uint8 point,
+        uint256 amount
+    ) internal {
+        if (puckState != PuckState.ON) revert BetUnavailable(oddsBetType, puckState);
+        if (lineBet.amount == 0) revert NoActiveBet(baseBetType);
+
+        _validateOddsAmount(amount, lineBet.amount, point, lineBet.oddsAmount + amount, oddsBetType);
+        _debitAvailable(msg.sender, amount);
+        lineBet.oddsAmount += amount;
+
+        emit BetPlaced(msg.sender, oddsBetType, amount);
+    }
+
+    function _placeComeTravelBet(Bet[4] storage bets, BetType betType, PuckState puckState, uint256 amount) internal {
+        if (puckState != PuckState.ON) revert BetUnavailable(betType, puckState);
+        _validateSingleBetAmount(amount, MIN_LINE_BET, MAX_LINE_BET, 1);
+
+        uint8 slotIndex = _findOpenLineBetSlot(bets);
+        if (slotIndex >= 4) revert InvalidIndex(slotIndex);
+
+        _debitAvailable(msg.sender, amount);
+        bets[slotIndex] = Bet({amount: amount, oddsAmount: 0, point: 0});
+
+        emit BetPlaced(msg.sender, betType, amount);
+    }
+
+    function _removeLineBetWithOdds(Bet storage lineBet, BetType betType) internal {
+        uint256 returnedAmount = lineBet.amount + lineBet.oddsAmount;
+        if (returnedAmount == 0) revert NoActiveBet(betType);
+
+        lineBet.amount = 0;
+        lineBet.oddsAmount = 0;
+        lineBet.point = 0;
+        _creditAvailable(msg.sender, returnedAmount);
+
+        emit BetRemoved(msg.sender, betType, returnedAmount);
+    }
+
+    function _removeOddsBet(Bet storage lineBet, BetType betType) internal {
+        uint256 returnedAmount = lineBet.oddsAmount;
+        if (returnedAmount == 0) revert NoActiveBet(betType);
+
+        lineBet.oddsAmount = 0;
+        _creditAvailable(msg.sender, returnedAmount);
+
+        emit BetRemoved(msg.sender, betType, returnedAmount);
+    }
+
+    function _removePlaceBet(PlaceBet storage placeSlot, BetType betType) internal {
+        uint256 returnedAmount = placeSlot.amount;
+        if (returnedAmount == 0) revert NoActiveBet(betType);
+
+        placeSlot.amount = 0;
+        placeSlot.working = false;
+        _creditAvailable(msg.sender, returnedAmount);
+
+        emit BetRemoved(msg.sender, betType, returnedAmount);
+    }
+
+    function _removeHardwayBet(HardwayBet storage hardwayBet, BetType betType) internal {
+        uint256 returnedAmount = hardwayBet.amount;
+        if (returnedAmount == 0) revert NoActiveBet(betType);
+
+        hardwayBet.amount = 0;
+        _creditAvailable(msg.sender, returnedAmount);
+
+        emit BetRemoved(msg.sender, betType, returnedAmount);
+    }
+
+    function _removeOneRollBet(OneRollBets storage oneRolls, BetType betType) internal {
+        uint256 returnedAmount = _oneRollBetAmount(oneRolls, betType);
+        if (returnedAmount == 0) revert NoActiveBet(betType);
+
+        _setOneRollBetAmount(oneRolls, betType, 0);
+        _creditAvailable(msg.sender, returnedAmount);
+
+        emit BetRemoved(msg.sender, betType, returnedAmount);
+    }
+
     function _isExcluded(address player) internal view returns (bool) {
         return selfExcluded[player] || operatorExcluded[player];
     }
@@ -1079,6 +1024,99 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
         }
     }
 
+    function _resolvePlaceBet(PlaceBet storage placeSlot, BetType betType, uint8 target, uint8 sum)
+        internal
+        returns (uint256 wonPayout, uint256 lostAmount)
+    {
+        uint256 amount = placeSlot.amount;
+        if (amount == 0) {
+            return (0, 0);
+        }
+
+        if (sum == 7) {
+            placeSlot.amount = 0;
+            placeSlot.working = false;
+            return (0, amount);
+        }
+
+        if (sum == target && placeSlot.working) {
+            return (_payoutAmount(amount, betType, target), 0);
+        }
+
+        return (0, 0);
+    }
+
+    function _resolveHardwayBet(HardwayBet storage hardwayBet, BetType betType, uint8 target, uint8 sum, uint8 die1, uint8 die2)
+        internal
+        returns (uint256 returnedAmount, uint256 wonPayout, uint256 lostAmount)
+    {
+        uint256 amount = hardwayBet.amount;
+        if (amount == 0) {
+            return (0, 0, 0);
+        }
+
+        if (sum == 7 || (sum == target && die1 != die2)) {
+            hardwayBet.amount = 0;
+            return (0, 0, amount);
+        }
+
+        if (sum == target && die1 == die2) {
+            hardwayBet.amount = 0;
+            return (amount, _payoutAmount(amount, betType, target), 0);
+        }
+
+        return (0, 0, 0);
+    }
+
+    function _resolveFieldBet(uint256 amount, uint8 sum)
+        internal
+        pure
+        returns (uint256 returnedAmount, uint256 wonPayout, uint256 lostAmount)
+    {
+        if (amount == 0) {
+            return (0, 0, 0);
+        }
+
+        if (sum == 2 || sum == 12 || sum == 3 || sum == 4 || sum == 9 || sum == 10 || sum == 11) {
+            return (amount, _payoutAmount(amount, BetType.FIELD, sum), 0);
+        }
+
+        return (0, 0, amount);
+    }
+
+    function _resolveOneRollBet(uint256 amount, BetType betType, uint8 sum)
+        internal
+        pure
+        returns (uint256 returnedAmount, uint256 wonPayout, uint256 lostAmount)
+    {
+        if (amount == 0) {
+            return (0, 0, 0);
+        }
+
+        bool wins;
+        if (betType == BetType.ANY_7) {
+            wins = sum == 7;
+        } else if (betType == BetType.ANY_CRAPS) {
+            wins = sum == 2 || sum == 3 || sum == 12;
+        } else if (betType == BetType.CRAPS_2) {
+            wins = sum == 2;
+        } else if (betType == BetType.CRAPS_3) {
+            wins = sum == 3;
+        } else if (betType == BetType.YO) {
+            wins = sum == 11;
+        } else if (betType == BetType.TWELVE) {
+            wins = sum == 12;
+        } else if (betType == BetType.HORN) {
+            wins = sum == 2 || sum == 3 || sum == 11 || sum == 12;
+        }
+
+        if (wins) {
+            return (amount, _payoutAmount(amount, betType, sum), 0);
+        }
+
+        return (0, 0, amount);
+    }
+
     function _assertInvariant() internal view {
         uint256 sumAvailable;
         uint256 sumInPlay;
@@ -1101,6 +1139,41 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
     function _assertInvariantIfNeeded() internal view {
         if (DEBUG) {
             _assertInvariant();
+        }
+    }
+
+    function _advanceSessionAfterRoll(SessionData storage session, uint8 priorPoint, uint8 sum) internal {
+        if (priorPoint == 0) {
+            if (_isPointNumber(sum)) {
+                session.point = sum;
+                session.phase = SessionPhase.POINT;
+                if (session.bets.passLine.amount != 0) {
+                    session.bets.passLine.point = sum;
+                }
+                if (session.bets.dontPass.amount != 0) {
+                    session.bets.dontPass.point = sum;
+                }
+                return;
+            }
+
+            session.point = 0;
+            session.phase = SessionPhase.COME_OUT;
+            return;
+        }
+
+        if (sum == 7 || sum == priorPoint) {
+            session.point = 0;
+            session.phase = SessionPhase.COME_OUT;
+            return;
+        }
+
+        session.point = priorPoint;
+        session.phase = SessionPhase.POINT;
+        if (session.bets.passLine.amount != 0) {
+            session.bets.passLine.point = priorPoint;
+        }
+        if (session.bets.dontPass.amount != 0) {
+            session.bets.dontPass.point = priorPoint;
         }
     }
 
@@ -1241,228 +1314,106 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
             }
         }
 
-        if (session.bets.place4.amount != 0) {
-            if (sum == 7) {
-                lostToBankroll += session.bets.place4.amount;
-                delete session.bets.place4;
-            } else if (sum == 4 && session.bets.place4.working) {
-                payout += _payoutAmount(session.bets.place4.amount, BetType.PLACE_4, 4);
-            }
-        }
+        uint256 wonPayout;
+        uint256 lostAmount;
+        uint256 returnedAmount;
 
-        if (session.bets.place5.amount != 0) {
-            if (sum == 7) {
-                lostToBankroll += session.bets.place5.amount;
-                delete session.bets.place5;
-            } else if (sum == 5 && session.bets.place5.working) {
-                payout += _payoutAmount(session.bets.place5.amount, BetType.PLACE_5, 5);
-            }
-        }
+        (wonPayout, lostAmount) = _resolvePlaceBet(session.bets.place4, BetType.PLACE_4, 4, sum);
+        payout += wonPayout;
+        lostToBankroll += lostAmount;
 
-        if (session.bets.place6.amount != 0) {
-            if (sum == 7) {
-                lostToBankroll += session.bets.place6.amount;
-                delete session.bets.place6;
-            } else if (sum == 6 && session.bets.place6.working) {
-                payout += _payoutAmount(session.bets.place6.amount, BetType.PLACE_6, 6);
-            }
-        }
+        (wonPayout, lostAmount) = _resolvePlaceBet(session.bets.place5, BetType.PLACE_5, 5, sum);
+        payout += wonPayout;
+        lostToBankroll += lostAmount;
 
-        if (session.bets.place8.amount != 0) {
-            if (sum == 7) {
-                lostToBankroll += session.bets.place8.amount;
-                delete session.bets.place8;
-            } else if (sum == 8 && session.bets.place8.working) {
-                payout += _payoutAmount(session.bets.place8.amount, BetType.PLACE_8, 8);
-            }
-        }
+        (wonPayout, lostAmount) = _resolvePlaceBet(session.bets.place6, BetType.PLACE_6, 6, sum);
+        payout += wonPayout;
+        lostToBankroll += lostAmount;
 
-        if (session.bets.place9.amount != 0) {
-            if (sum == 7) {
-                lostToBankroll += session.bets.place9.amount;
-                delete session.bets.place9;
-            } else if (sum == 9 && session.bets.place9.working) {
-                payout += _payoutAmount(session.bets.place9.amount, BetType.PLACE_9, 9);
-            }
-        }
+        (wonPayout, lostAmount) = _resolvePlaceBet(session.bets.place8, BetType.PLACE_8, 8, sum);
+        payout += wonPayout;
+        lostToBankroll += lostAmount;
 
-        if (session.bets.place10.amount != 0) {
-            if (sum == 7) {
-                lostToBankroll += session.bets.place10.amount;
-                delete session.bets.place10;
-            } else if (sum == 10 && session.bets.place10.working) {
-                payout += _payoutAmount(session.bets.place10.amount, BetType.PLACE_10, 10);
-            }
-        }
+        (wonPayout, lostAmount) = _resolvePlaceBet(session.bets.place9, BetType.PLACE_9, 9, sum);
+        payout += wonPayout;
+        lostToBankroll += lostAmount;
 
-        if (session.bets.hard4.amount != 0) {
-            if (sum == 7 || (sum == 4 && die1 != die2)) {
-                lostToBankroll += session.bets.hard4.amount;
-                session.bets.hard4.amount = 0;
-            } else if (sum == 4 && die1 == die2) {
-                returnedToAvailable += session.bets.hard4.amount;
-                payout += _payoutAmount(session.bets.hard4.amount, BetType.HARD_4, 4);
-                session.bets.hard4.amount = 0;
-            }
-        }
+        (wonPayout, lostAmount) = _resolvePlaceBet(session.bets.place10, BetType.PLACE_10, 10, sum);
+        payout += wonPayout;
+        lostToBankroll += lostAmount;
 
-        if (session.bets.hard6.amount != 0) {
-            if (sum == 7 || (sum == 6 && die1 != die2)) {
-                lostToBankroll += session.bets.hard6.amount;
-                session.bets.hard6.amount = 0;
-            } else if (sum == 6 && die1 == die2) {
-                returnedToAvailable += session.bets.hard6.amount;
-                payout += _payoutAmount(session.bets.hard6.amount, BetType.HARD_6, 6);
-                session.bets.hard6.amount = 0;
-            }
-        }
+        (returnedAmount, wonPayout, lostAmount) = _resolveHardwayBet(session.bets.hard4, BetType.HARD_4, 4, sum, die1, die2);
+        returnedToAvailable += returnedAmount;
+        payout += wonPayout;
+        lostToBankroll += lostAmount;
 
-        if (session.bets.hard8.amount != 0) {
-            if (sum == 7 || (sum == 8 && die1 != die2)) {
-                lostToBankroll += session.bets.hard8.amount;
-                session.bets.hard8.amount = 0;
-            } else if (sum == 8 && die1 == die2) {
-                returnedToAvailable += session.bets.hard8.amount;
-                payout += _payoutAmount(session.bets.hard8.amount, BetType.HARD_8, 8);
-                session.bets.hard8.amount = 0;
-            }
-        }
+        (returnedAmount, wonPayout, lostAmount) = _resolveHardwayBet(session.bets.hard6, BetType.HARD_6, 6, sum, die1, die2);
+        returnedToAvailable += returnedAmount;
+        payout += wonPayout;
+        lostToBankroll += lostAmount;
 
-        if (session.bets.hard10.amount != 0) {
-            if (sum == 7 || (sum == 10 && die1 != die2)) {
-                lostToBankroll += session.bets.hard10.amount;
-                session.bets.hard10.amount = 0;
-            } else if (sum == 10 && die1 == die2) {
-                returnedToAvailable += session.bets.hard10.amount;
-                payout += _payoutAmount(session.bets.hard10.amount, BetType.HARD_10, 10);
-                session.bets.hard10.amount = 0;
-            }
-        }
+        (returnedAmount, wonPayout, lostAmount) = _resolveHardwayBet(session.bets.hard8, BetType.HARD_8, 8, sum, die1, die2);
+        returnedToAvailable += returnedAmount;
+        payout += wonPayout;
+        lostToBankroll += lostAmount;
 
-        if (session.bets.oneRolls.field != 0) {
-            uint256 amount = session.bets.oneRolls.field;
-            returnedToAvailable += amount;
+        (returnedAmount, wonPayout, lostAmount) = _resolveHardwayBet(session.bets.hard10, BetType.HARD_10, 10, sum, die1, die2);
+        returnedToAvailable += returnedAmount;
+        payout += wonPayout;
+        lostToBankroll += lostAmount;
 
-            if (sum == 2 || sum == 12) {
-                payout += _payoutAmount(amount, BetType.FIELD, sum);
-            } else if (sum == 3 || sum == 4 || sum == 9 || sum == 10 || sum == 11) {
-                payout += _payoutAmount(amount, BetType.FIELD, sum);
-            } else {
-                returnedToAvailable -= amount;
-                lostToBankroll += amount;
-            }
+        (returnedAmount, wonPayout, lostAmount) = _resolveFieldBet(session.bets.oneRolls.field, sum);
+        returnedToAvailable += returnedAmount;
+        payout += wonPayout;
+        lostToBankroll += lostAmount;
+        session.bets.oneRolls.field = 0;
 
-            session.bets.oneRolls.field = 0;
-        }
+        (returnedAmount, wonPayout, lostAmount) = _resolveOneRollBet(session.bets.oneRolls.any7, BetType.ANY_7, sum);
+        returnedToAvailable += returnedAmount;
+        payout += wonPayout;
+        lostToBankroll += lostAmount;
+        session.bets.oneRolls.any7 = 0;
 
-        if (session.bets.oneRolls.any7 != 0) {
-            uint256 amount = session.bets.oneRolls.any7;
-            if (sum == 7) {
-                returnedToAvailable += amount;
-                payout += _payoutAmount(amount, BetType.ANY_7, sum);
-            } else {
-                lostToBankroll += amount;
-            }
-            session.bets.oneRolls.any7 = 0;
-        }
+        (returnedAmount, wonPayout, lostAmount) = _resolveOneRollBet(session.bets.oneRolls.anyCraps, BetType.ANY_CRAPS, sum);
+        returnedToAvailable += returnedAmount;
+        payout += wonPayout;
+        lostToBankroll += lostAmount;
+        session.bets.oneRolls.anyCraps = 0;
 
-        if (session.bets.oneRolls.anyCraps != 0) {
-            uint256 amount = session.bets.oneRolls.anyCraps;
-            if (sum == 2 || sum == 3 || sum == 12) {
-                returnedToAvailable += amount;
-                payout += _payoutAmount(amount, BetType.ANY_CRAPS, sum);
-            } else {
-                lostToBankroll += amount;
-            }
-            session.bets.oneRolls.anyCraps = 0;
-        }
+        (returnedAmount, wonPayout, lostAmount) = _resolveOneRollBet(session.bets.oneRolls.craps2, BetType.CRAPS_2, sum);
+        returnedToAvailable += returnedAmount;
+        payout += wonPayout;
+        lostToBankroll += lostAmount;
+        session.bets.oneRolls.craps2 = 0;
 
-        if (session.bets.oneRolls.craps2 != 0) {
-            uint256 amount = session.bets.oneRolls.craps2;
-            if (sum == 2) {
-                returnedToAvailable += amount;
-                payout += _payoutAmount(amount, BetType.CRAPS_2, sum);
-            } else {
-                lostToBankroll += amount;
-            }
-            session.bets.oneRolls.craps2 = 0;
-        }
+        (returnedAmount, wonPayout, lostAmount) = _resolveOneRollBet(session.bets.oneRolls.craps3, BetType.CRAPS_3, sum);
+        returnedToAvailable += returnedAmount;
+        payout += wonPayout;
+        lostToBankroll += lostAmount;
+        session.bets.oneRolls.craps3 = 0;
 
-        if (session.bets.oneRolls.craps3 != 0) {
-            uint256 amount = session.bets.oneRolls.craps3;
-            if (sum == 3) {
-                returnedToAvailable += amount;
-                payout += _payoutAmount(amount, BetType.CRAPS_3, sum);
-            } else {
-                lostToBankroll += amount;
-            }
-            session.bets.oneRolls.craps3 = 0;
-        }
+        (returnedAmount, wonPayout, lostAmount) = _resolveOneRollBet(session.bets.oneRolls.yo, BetType.YO, sum);
+        returnedToAvailable += returnedAmount;
+        payout += wonPayout;
+        lostToBankroll += lostAmount;
+        session.bets.oneRolls.yo = 0;
 
-        if (session.bets.oneRolls.yo != 0) {
-            uint256 amount = session.bets.oneRolls.yo;
-            if (sum == 11) {
-                returnedToAvailable += amount;
-                payout += _payoutAmount(amount, BetType.YO, sum);
-            } else {
-                lostToBankroll += amount;
-            }
-            session.bets.oneRolls.yo = 0;
-        }
+        (returnedAmount, wonPayout, lostAmount) = _resolveOneRollBet(session.bets.oneRolls.twelve, BetType.TWELVE, sum);
+        returnedToAvailable += returnedAmount;
+        payout += wonPayout;
+        lostToBankroll += lostAmount;
+        session.bets.oneRolls.twelve = 0;
 
-        if (session.bets.oneRolls.twelve != 0) {
-            uint256 amount = session.bets.oneRolls.twelve;
-            if (sum == 12) {
-                returnedToAvailable += amount;
-                payout += _payoutAmount(amount, BetType.TWELVE, sum);
-            } else {
-                lostToBankroll += amount;
-            }
-            session.bets.oneRolls.twelve = 0;
-        }
-
-        if (session.bets.oneRolls.horn != 0) {
-            uint256 amount = session.bets.oneRolls.horn;
-            if (sum == 2 || sum == 3 || sum == 11 || sum == 12) {
-                returnedToAvailable += amount;
-                payout += _payoutAmount(amount, BetType.HORN, sum);
-            } else {
-                lostToBankroll += amount;
-            }
-            session.bets.oneRolls.horn = 0;
-        }
+        (returnedAmount, wonPayout, lostAmount) = _resolveOneRollBet(session.bets.oneRolls.horn, BetType.HORN, sum);
+        returnedToAvailable += returnedAmount;
+        payout += wonPayout;
+        lostToBankroll += lostAmount;
+        session.bets.oneRolls.horn = 0;
 
         _softMoveInPlayToAvailable(player, returnedToAvailable);
         _softMoveInPlayToBankroll(player, lostToBankroll);
         uint256 actualPayout = _softReleaseReserve(player, payout);
-
-        if (priorPoint == 0) {
-            if (_isPointNumber(sum)) {
-                session.point = sum;
-                session.phase = SessionPhase.POINT;
-                if (session.bets.passLine.amount != 0) {
-                    session.bets.passLine.point = sum;
-                }
-                if (session.bets.dontPass.amount != 0) {
-                    session.bets.dontPass.point = sum;
-                }
-            } else {
-                session.point = 0;
-                session.phase = SessionPhase.COME_OUT;
-            }
-        } else if (sum == 7 || sum == priorPoint) {
-            session.point = 0;
-            session.phase = SessionPhase.COME_OUT;
-        } else {
-            session.point = priorPoint;
-            session.phase = SessionPhase.POINT;
-            if (session.bets.passLine.amount != 0) {
-                session.bets.passLine.point = priorPoint;
-            }
-            if (session.bets.dontPass.amount != 0) {
-                session.bets.dontPass.point = priorPoint;
-            }
-        }
+        _advanceSessionAfterRoll(session, priorPoint, sum);
 
         session.pendingRequestId = 0;
         session.lastActivityTime = uint48(block.timestamp);

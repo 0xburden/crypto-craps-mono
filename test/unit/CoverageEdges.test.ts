@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { ethers } from "hardhat";
 
-import { BetType, PuckState, SessionPhase, deployGameFixture, rollAndFulfill, usd } from "./helpers/gameFixture";
+import { BetType, PuckState, deployGameFixture, rollAndFulfill, usd } from "./helpers/gameFixture";
 
 const POINT_DICE: Record<number, [number, number]> = {
   4: [1, 3],
@@ -45,10 +45,10 @@ describe("CoverageEdges", function () {
     const { owner, alice, token, coordinator, game } = await loadFixture(deployGameFixture);
 
     expect(await game.token()).to.equal(await token.getAddress());
-    expect(await game.vrfCoordinator()).to.equal(await coordinator.getAddress());
-    expect(await game.availableBalanceOf(alice.address)).to.equal(0n);
-    expect(await game.inPlayBalanceOf(alice.address)).to.equal(0n);
-    expect(await game.reservedBalanceOf(alice.address)).to.equal(0n);
+    const initialState = await game.getPlayerState(alice.address);
+    expect(initialState.available).to.equal(0n);
+    expect(initialState.inPlay).to.equal(0n);
+    expect(initialState.reserved).to.equal(0n);
 
     await game.connect(owner).pause();
     await game.connect(owner).unpause();
@@ -183,23 +183,6 @@ describe("CoverageEdges", function () {
     expect(state.pendingRequestId).to.equal(0n);
     expect(state.point).to.equal(0n);
 
-    const mismatchFixture = await fundedFixture();
-    await mismatchFixture.game.connect(mismatchFixture.alice).placeBet(BetType.PASS_LINE, usd(100));
-    await mismatchFixture.game.connect(mismatchFixture.alice).rollDice();
-    state = await mismatchFixture.game.getPlayerState(mismatchFixture.alice.address);
-    await mismatchFixture.game.exposedSetSessionState(
-      mismatchFixture.alice.address,
-      SessionPhase.ROLL_PENDING,
-      0,
-      state.pendingRequestId + 1n,
-      state.lastActivityTime
-    );
-    await mismatchFixture.coordinator.fulfillRandomWords(state.pendingRequestId, [1n]);
-
-    state = await mismatchFixture.game.getPlayerState(mismatchFixture.alice.address);
-    expect(state.pendingRequestId).to.equal(0n);
-    expect(state.phase).to.equal(SessionPhase.COME_OUT);
-    expect(state.reserved).to.equal(0n);
   });
 
   it("covers invalid payout multiplier fallbacks in PayoutMath", async function () {

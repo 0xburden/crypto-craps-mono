@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 
-import { BetType, SessionPhase, deployGameFixture, rollAndFulfill, usd } from "./helpers/gameFixture";
+import { BetType, SessionPhase, assertInvariant, deployGameFixture, rollAndFulfill, usd } from "./helpers/gameFixture";
 
 const POINT_DICE: Record<number, [number, number]> = {
   4: [1, 3],
@@ -70,7 +70,7 @@ describe("ComeBets", function () {
     expect(state.bets.come[0].amount).to.equal(0n);
     expect(state.bets.come[0].oddsAmount).to.equal(0n);
 
-    await game.exposedAssertInvariant();
+    await assertInvariant(game, [alice]);
   });
 
   it("resolves pending and established come bets in opposite directions on a seven-out", async function () {

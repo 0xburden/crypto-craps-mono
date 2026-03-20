@@ -1,3 +1,4 @@
+import { expect } from "chai";
 import { ethers } from "hardhat";
 
 export const UNIT = 10n ** 6n;
@@ -55,11 +56,11 @@ export async function deployGameFixture() {
 
   const tokenFactory = await ethers.getContractFactory("MockERC20");
   const coordinatorFactory = await ethers.getContractFactory("MockVRFCoordinator");
-  const gameFactory = await ethers.getContractFactory("CrapsGameHarness");
+  const gameFactory = await ethers.getContractFactory("CrapsGame");
 
   const token = await tokenFactory.deploy("Mock USDC", "mUSDC");
   const coordinator = await coordinatorFactory.deploy();
-  const game = await gameFactory.deploy(await token.getAddress(), await coordinator.getAddress(), true);
+  const game = await gameFactory.deploy(await token.getAddress(), await coordinator.getAddress(), 1, ethers.ZeroHash, true);
 
   const richAmount = usd(1_000_000);
   for (const signer of [owner, alice, bob, carol]) {
@@ -84,4 +85,26 @@ export async function rollAndFulfill(
   const state = await game.getPlayerState(roller.address);
   await coordinator.fulfillRandomWords(state.pendingRequestId, [encodeDice(die1, die2)]);
   return state.pendingRequestId;
+}
+
+export async function assertInvariant(
+  game: Awaited<ReturnType<typeof deployGameFixture>>["game"],
+  players: Array<Awaited<ReturnType<typeof ethers.getSigners>>[number]>
+) {
+  const states = await Promise.all(players.map((player) => game.getPlayerState(player.address)));
+
+  let sumAvailable = 0n;
+  let sumInPlay = 0n;
+  let sumReserved = 0n;
+
+  for (const state of states) {
+    sumAvailable += state.available;
+    sumInPlay += state.inPlay;
+    sumReserved += state.reserved;
+  }
+
+  const token = await ethers.getContractAt("MockERC20", await game.token());
+  const contractBalance = await token.balanceOf(await game.getAddress());
+  const houseState = states[0];
+  expect(contractBalance).to.equal(sumAvailable + sumInPlay + sumReserved + houseState.bankroll + houseState.accruedFees);
 }
