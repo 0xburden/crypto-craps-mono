@@ -143,7 +143,7 @@ struct BetSlots {
 **Notes:**
 - `Bet` is used for line bets and for each Come / Don't Come slot.
 - `Bet.point == 0` means the Come / Don't Come bet is still pending/traveling.
-- `PlaceBet.working` is the ON/OFF toggle. Defaults to OFF when first placed during puck OFF phase.
+- `PlaceBet.working` is the ON/OFF toggle. Defaults to ON when first placed during the point phase; if the bet survives into a later come-out roll, the player may toggle it before rolling again.
 - All `amount` fields are denominated in the deployment token's smallest units.
 
 **Index usage:**
@@ -168,7 +168,7 @@ player calls deposit()
 
 **Four phases:**
 - `INACTIVE` — no session. Player can deposit and place first bet to start
-- `COME_OUT` — puck OFF, no point established. Player places Pass/Don't Pass and other bets, then rolls
+- `COME_OUT` — puck OFF, no point established. Player places Pass/Don't Pass, Field, and one-roll bets; surviving Place bets/Hardways may remain on the layout, then rolls
 - `POINT` — puck ON, point established. Player can add Odds, Come/Don't Come, adjust Place bets, then rolls
 - `ROLL_PENDING` — VRF request in flight. All bet placement and removal blocked until callback resolves
 
@@ -418,9 +418,9 @@ The following tests must exist and pass before Phase 2 is considered complete:
 | Don't Pass Odds | True odds | 0% | Puck ON only, max 3x |
 | Come Odds | True odds | 0% | Puck ON only, max 3x, attached to specific Come bet |
 | Don't Come Odds | True odds | 0% | Puck ON only, max 3x |
-| Place 6, Place 8 | 7:6 | 1.52% | Either phase, player toggles ON/OFF |
-| Place 5, Place 9 | 7:5 | 4.00% | Either phase, player toggles ON/OFF |
-| Place 4, Place 10 | 9:5 | 6.67% | Either phase, player toggles ON/OFF |
+| Place 6, Place 8 | 7:6 | 1.52% | Placed only when puck ON; surviving bets can be toggled ON/OFF later |
+| Place 5, Place 9 | 7:5 | 4.00% | Placed only when puck ON; surviving bets can be toggled ON/OFF later |
+| Place 4, Place 10 | 9:5 | 6.67% | Placed only when puck ON; surviving bets can be toggled ON/OFF later |
 | Field | 1:1 (2 and 12 pay 2:1) | 5.56% | Either phase, one-roll bet |
 | Hardway 6, Hardway 8 | 9:1 | 9.09% | Either phase, max $100 |
 | Hardway 4, Hardway 10 | 7:1 | 11.11% | Either phase, max $100 |
@@ -440,14 +440,14 @@ Just like a real casino, proposition and one-roll bets have lower maximums than 
 
 | Bet Category | Minimum | Maximum |
 |---|---|---|
-| Pass / Don't Pass | $5 | $500 |
-| Come / Don't Come | $5 | $500 |
+| Pass / Don't Pass | $1 | $500 |
+| Come / Don't Come | $1 | $500 |
 | Odds (Pass, Don't Pass, Come, Don't Come) | See multiples table below | 3× flat bet |
 | Place 4, 5, 9, 10 | $5 | $500 |
 | Place 6, 8 | $6 | $500 (must be multiple of 6; effective max $498) |
-| Field | $5 | $500 |
-| Hardways | $5 | $100 |
-| Proposition / One-Roll (Any 7, Any Craps, Craps 2, Craps 3, Yo, Twelve) | $5 | $100 |
+| Field | $1 | $500 |
+| Hardways | $1 | $100 |
+| Proposition / One-Roll (Any 7, Any Craps, Craps 2, Craps 3, Yo, Twelve) | $1 | $100 |
 | Horn | $4 (multiple of 4) | $100 |
 
 These limits are set as immutable constructor parameters per deployment. Different limit tiers require deploying separate contract instances.
@@ -460,25 +460,25 @@ All bets with fractional payouts must be placed in exact multiples to ensure cle
 
 | Bet | Payout | Math | Required Multiple | Minimum |
 |---|---|---|---|---|
-| Pass Line | 1:1 | `amount * 1` | 1 (any) | $5 |
-| Don't Pass | 1:1 | `amount * 1` | 1 (any) | $5 |
-| Come | 1:1 | `amount * 1` | 1 (any) | $5 |
-| Don't Come | 1:1 | `amount * 1` | 1 (any) | $5 |
+| Pass Line | 1:1 | `amount * 1` | 1 (any) | $1 |
+| Don't Pass | 1:1 | `amount * 1` | 1 (any) | $1 |
+| Come | 1:1 | `amount * 1` | 1 (any) | $1 |
+| Don't Come | 1:1 | `amount * 1` | 1 (any) | $1 |
 
 **Pass / Come Odds (payout depends on point):**
 
-| Point | Payout | Math | Required Multiple | Minimum |
+| Point | Payout | Math | Required Multiple | Minimum* |
 |---|---|---|---|---|
-| 4 or 10 | 2:1 | `amount * 2` | 1 (any) | $5 |
-| 5 or 9 | 3:2 | `amount * 3 / 2` | 2 | $6 |
+| 4 or 10 | 2:1 | `amount * 2` | 1 (any) | $1 |
+| 5 or 9 | 3:2 | `amount * 3 / 2` | 2 | $2 |
 | 6 or 8 | 6:5 | `amount * 6 / 5` | 5 | $5 |
 
 **Don't Pass / Don't Come Odds (payout depends on point):**
 
-| Point | Payout | Math | Required Multiple | Minimum |
+| Point | Payout | Math | Required Multiple | Minimum* |
 |---|---|---|---|---|
-| 4 or 10 | 1:2 | `amount / 2` | 2 | $6 |
-| 5 or 9 | 2:3 | `amount * 2 / 3` | 3 | $6 |
+| 4 or 10 | 1:2 | `amount / 2` | 2 | $2 |
+| 5 or 9 | 2:3 | `amount * 2 / 3` | 3 | $3 |
 | 6 or 8 | 5:6 | `amount * 5 / 6` | 6 | $6 |
 
 **Place bets:**
@@ -493,18 +493,20 @@ All bets with fractional payouts must be placed in exact multiples to ensure cle
 
 | Bet | Payout | Math | Required Multiple | Minimum | Maximum |
 |---|---|---|---|---|---|
-| Field (base) | 1:1 | `amount * 1` | 1 (any) | $5 | $500 |
+| Field (base) | 1:1 | `amount * 1` | 1 (any) | $1 | $500 |
 | Field (on 2) | 2:1 | `amount * 2` | 1 (any) | — | — |
 | Field (on 12) | 2:1 | `amount * 2` | 1 (any) | — | — |
-| Hardway 6/8 | 9:1 | `amount * 9` | 1 (any) | $5 | $100 |
-| Hardway 4/10 | 7:1 | `amount * 7` | 1 (any) | $5 | $100 |
-| Any 7 | 4:1 | `amount * 4` | 1 (any) | $5 | $100 |
-| Any Craps | 7:1 | `amount * 7` | 1 (any) | $5 | $100 |
-| Craps 2 | 30:1 | `amount * 30` | 1 (any) | $5 | $100 |
-| Craps 3 | 15:1 | `amount * 15` | 1 (any) | $5 | $100 |
-| Yo (11) | 15:1 | `amount * 15` | 1 (any) | $5 | $100 |
-| Twelve (12) | 30:1 | `amount * 30` | 1 (any) | $5 | $100 |
+| Hardway 6/8 | 9:1 | `amount * 9` | 1 (any) | $1 | $100 |
+| Hardway 4/10 | 7:1 | `amount * 7` | 1 (any) | $1 | $100 |
+| Any 7 | 4:1 | `amount * 4` | 1 (any) | $1 | $100 |
+| Any Craps | 7:1 | `amount * 7` | 1 (any) | $1 | $100 |
+| Craps 2 | 30:1 | `amount * 30` | 1 (any) | $1 | $100 |
+| Craps 3 | 15:1 | `amount * 15` | 1 (any) | $1 | $100 |
+| Yo (11) | 15:1 | `amount * 15` | 1 (any) | $1 | $100 |
+| Twelve (12) | 30:1 | `amount * 30` | 1 (any) | $1 | $100 |
 | Horn | 2/12 net `27:4`, 3/11 net `3:1` | see outcome | 4 | $4 | $100 |
+
+*For odds bets, the minimum must still satisfy the separate `amount <= 3 * flatBet` cap. A mathematically valid multiple may still be unavailable if the attached flat bet is too small.*
 
 **Odds bet interaction with 3x cap:** Odds bets are capped at 3x the flat bet. A player with a $5 Pass Line on a point of 5 can take up to $15 in odds, but the odds amount must be a multiple of 2. So their valid choices are $6, $8, $10, $12, or $14 — not $15. The contract validates both constraints independently: `amount <= 3 * flatBet` and `amount % requiredMultiple == 0`. The effective max is the largest valid multiple at or below the 3x cap, but the contract does not compute that — it just rejects invalid amounts.
 
@@ -561,7 +563,7 @@ The removal function validates that the bet type is removable per the rules abov
 
 ### Bet Availability by Puck State
 
-The player can turn on any or all of their bets when the puck is off, matching a real bubble craps machine. The contract enforces which bets are valid in each phase:
+The contract enforces which bets are valid in each phase. In the implemented ruleset, new Place bets still require the puck to be ON; however, Place bets that survive into a later come-out roll may be toggled ON/OFF or removed before the next roll.
 
 **Puck OFF (no point established — come-out roll):**
 
@@ -569,7 +571,7 @@ The player can turn on any or all of their bets when the puck is off, matching a
 |---|---|---|
 | Pass Line | ✅ | Must be placed before come-out |
 | Don't Pass | ✅ | Must be placed before come-out |
-| Place Bets | ✅ | Player can toggle ON for come-out (default OFF) |
+| Place Bets | ❌ | New Place bets require puck ON; surviving Place bets may still be toggled or removed |
 | Field | ✅ | One-roll, resolves immediately |
 | Hardways | ✅ | Persist until they hit or 7-out |
 | Any 7 / Any Craps / Craps 2 / Craps 3 / Yo / Twelve / Horn | ✅ | One-roll, resolve immediately |
@@ -582,16 +584,17 @@ The player can turn on any or all of their bets when the puck is off, matching a
 |---|---|---|
 | Come / Don't Come | ✅ | Now available |
 | Odds (Pass, Don't Pass, Come, Don't Come) | ✅ | Now available, max 3× flat bet |
-| Place Bets | ✅ | Can add/remove/change at any time |
+| Place Bets | ✅ | New Place bets can be added; existing ones can be removed or toggled |
 | Field | ✅ | One-roll |
 | Hardways | ✅ | Can add if not already active |
 | Any 7 / Any Craps / Craps 2 / Craps 3 / Yo / Twelve / Horn | ✅ | One-roll |
 | Pass Line | ❌ | Cannot be placed mid-round |
 | Don't Pass | ❌ | Cannot be placed mid-round |
 
-**Place Bet Toggle:** Place bets have an `active` flag per session. When puck is OFF, the player can toggle individual Place bets ON or OFF before rolling. When toggled OFF, the bet stays on the layout (funds remain in `_inPlay`) but does not win on its number. However, a 7 kills ALL Place bets regardless of toggle state — ON or OFF, come-out or point phase. This mirrors standard casino rules where a seven-out sweeps the entire layout. Players may also remove Place bets entirely (returning funds to `_available`).
+**Place Bet Toggle:** Place bets have an `active` flag per session. When a Place bet survives into puck OFF, the player can toggle it ON or OFF before rolling. When toggled OFF, the bet stays on the layout (funds remain in `_inPlay`) but does not win on its number. However, a 7 kills ALL Place bets regardless of toggle state — ON or OFF, come-out or point phase. This mirrors standard casino rules where a seven-out sweeps the entire layout. Players may also remove Place bets entirely (returning funds to `_available`).
 
 ### Odds Payout Table (3x Max)
+
 
 | Point | Pass Odds Payout | Don't Pass Odds Payout |
 |---|---|---|
@@ -1095,7 +1098,7 @@ Comprehensive unit tests in `PayoutMath.test.ts` covering every bet type, every 
 
 ### Table Parameters
 
-- Table minimum: $5 (or $6 for bets requiring multiples of 6)
+- Table minimums vary by bet class: $1 for line/come/field/hardway/most props, $4 for Horn, $5 for Place 4/5/9/10, and $6 for Place 6/8
 - Table maximum: $500 (line/place/field), $100 (props/hardways)
 - Max odds: 3x
 - Recommended initial bankroll: $50,000 for launch (in token units). Operators may fund more for additional headroom.
@@ -1788,9 +1791,9 @@ When a new contract version is deployed and the old contract is paused:
 
 10. **Session timeout: 24 hours.** Inactive sessions expire after 24 hours. All bets returned to `_available`, player can withdraw at any time. Expiry can fire during `ROLL_PENDING` — reserve returned to bankroll, requestToPlayer mapping deleted.
 
-11. **Bet availability:** All bets can be placed and toggled ON when the puck is off (come-out phase), matching a real bubble craps machine. Come/Don't Come and Odds bets unlock when the puck is on (point established). See Bet Availability by Puck State for full matrix.
+11. **Bet availability:** Pass/Don't Pass, Field, Hardways, and one-roll props are available on come-out. Come/Don't Come and all Odds bets unlock once a point is established. New Place bets also require the puck to be ON, though surviving Place bets may still be toggled or removed during come-out. See Bet Availability by Puck State for the full matrix.
 
-12. **Payout multiples:** All bets with fractional payouts require exact multiples at placement time (e.g., Place 6/8 in multiples of 6, Don't Pass odds on 5/9 in multiples of 3). This eliminates rounding in PayoutMath entirely. Some effective minimums exceed the $5 table minimum (e.g., Place 6 minimum is $6).
+12. **Payout multiples:** All bets with fractional payouts require exact multiples at placement time (e.g., Place 6/8 in multiples of 6, Don't Pass odds on 5/9 in multiples of 3). This eliminates rounding in PayoutMath entirely. Effective minimums therefore vary by bet class and multiplier constraints (for example, Horn minimum is $4 and Place 6 minimum is $6).
 
 13. **Fixed-size bet storage.** No dynamic arrays in the Session struct. All bet slots are fixed-size structs or fixed-length arrays. Empty bets are zero-amount entries. This makes gas consumption predictable and eliminates dynamic array management overhead.
 

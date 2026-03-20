@@ -1,7 +1,8 @@
 import { expect } from "chai";
+import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { ethers } from "hardhat";
 
-import { usd } from "./helpers/gameFixture";
+import { SessionPhase, deployGameFixture, usd } from "./helpers/gameFixture";
 
 describe("WorstCaseAudit", function () {
   it("matches the PLAN.md phase-4 bankroll sizing worst-case reserve derivation", async function () {
@@ -36,5 +37,26 @@ describe("WorstCaseAudit", function () {
     };
 
     expect(await harness.maxPossiblePayout(bets, 4)).to.equal(usd(19_600));
+  });
+
+  it("reserves the full 19.6k worst-case amount on a live roll request", async function () {
+    const { owner, alice, game } = await loadFixture(deployGameFixture);
+
+    await game.connect(owner).fundBankroll(usd(100_000));
+    await game.connect(alice).deposit(usd(20_000));
+    await game.connect(alice).openSession();
+    await game.exposedSeedPointFourWorstCase(alice.address);
+
+    await expect(game.connect(alice).rollDice())
+      .to.emit(game, "RollRequested")
+      .withArgs(alice.address, 1n, usd(19_600));
+
+    const state = await game.getPlayerState(alice.address);
+    expect(state.phase).to.equal(SessionPhase.ROLL_PENDING);
+    expect(state.point).to.equal(4n);
+    expect(state.reserved).to.equal(usd(19_600));
+    expect(state.pendingRequestId).to.equal(1n);
+
+    await game.exposedAssertInvariant();
   });
 });

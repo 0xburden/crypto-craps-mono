@@ -110,6 +110,27 @@ describe("ComeBets", function () {
     }
   });
 
+  it("supports all four don't come slots and rejects a fifth concurrent don't come bet", async function () {
+    const { alice, coordinator, game } = await enterPointAndClearLine(6);
+
+    for (let i = 0; i < 4; i += 1) {
+      await game.connect(alice).placeBet(BetType.DONT_COME, usd(100));
+    }
+
+    await expect(game.connect(alice).placeBet(BetType.DONT_COME, usd(100)))
+      .to.be.revertedWithCustomError(game, "InvalidIndex");
+
+    await rollAndFulfill(game, coordinator, alice, 1, 3);
+
+    const state = await game.getPlayerState(alice.address);
+    expect(state.phase).to.equal(SessionPhase.POINT);
+    expect(state.point).to.equal(6n);
+    for (let i = 0; i < 4; i += 1) {
+      expect(state.bets.dontCome[i].amount).to.equal(usd(100));
+      expect(state.bets.dontCome[i].point).to.equal(4n);
+    }
+  });
+
   it("mirrors don't come win, push, removal, and seven-out odds payout behavior", async function () {
     const winFixture = await enterPointAndClearLine(6);
     await winFixture.game.connect(winFixture.alice).placeBet(BetType.DONT_COME, usd(100));
