@@ -175,6 +175,23 @@ describe("Vault", function () {
     await game.exposedAssertInvariant();
   });
 
+  it("allows fee withdrawal while paused", async function () {
+    const { owner, alice, treasury, token, game } = await loadFixture(deployFixture);
+
+    await game.connect(alice).deposit(usd(1_000));
+    await game.connect(owner).pause();
+
+    const expectedFees = feeFor(usd(1_000));
+
+    await expect(game.connect(owner).withdrawFees(treasury.address))
+      .to.emit(game, "FeesWithdrawn")
+      .withArgs(treasury.address, expectedFees);
+
+    expect(await game.accruedFees()).to.equal(0n);
+    expect(await token.balanceOf(treasury.address)).to.equal(expectedFees);
+    await game.exposedAssertInvariant();
+  });
+
   it("funds the bankroll bucket and preserves the invariant", async function () {
     const { owner, token, game } = await loadFixture(deployFixture);
     const amount = usd(50_000);
@@ -189,6 +206,16 @@ describe("Vault", function () {
     expect(await game.totalInPlay()).to.equal(0n);
     expect(await game.totalReserved()).to.equal(0n);
     await game.exposedAssertInvariant();
+  });
+
+  it("restricts vault administration functions to the owner", async function () {
+    const { alice, treasury, game } = await loadFixture(deployFixture);
+
+    await expect(game.connect(alice).fundBankroll(usd(1_000))).to.be.revertedWith("Only callable by owner");
+    await expect(game.connect(alice).withdrawBankroll(usd(1_000))).to.be.revertedWith("Only callable by owner");
+    await expect(game.connect(alice).pause()).to.be.revertedWith("Only callable by owner");
+    await expect(game.connect(alice).unpause()).to.be.revertedWith("Only callable by owner");
+    await expect(game.connect(alice).withdrawFees(treasury.address)).to.be.revertedWith("Only callable by owner");
   });
 
   it("requires pause before bankroll withdrawal and decreases the bankroll bucket correctly", async function () {
@@ -209,6 +236,19 @@ describe("Vault", function () {
     expect(await game.bankroll()).to.equal(funded - withdrawn);
     expect(await token.balanceOf(await game.getAddress())).to.equal(funded - withdrawn);
     await game.exposedAssertInvariant();
+  });
+
+  it("blocks bankroll withdrawal while VRF requests are still outstanding", async function () {
+    const { owner, game } = await loadFixture(deployFixture);
+
+    await game.connect(owner).fundBankroll(usd(15_000));
+    await game.connect(owner).pause();
+    await game.exposedSetPendingVRFRequests(1);
+
+    await expect(game.connect(owner).withdrawBankroll(usd(1_000))).to.be.revertedWithCustomError(
+      game,
+      "PendingVRFRequestsOutstanding"
+    );
   });
 
   it("exposes vault state through getPlayerState", async function () {
@@ -238,6 +278,29 @@ describe("Vault", function () {
     expect(state.operatorExcluded).to.equal(false);
     expect(state.reinstatementEligibleAt).to.equal(0n);
     expect(state.bets.passLine.amount).to.equal(0n);
+  });
+
+  it("maintains the literal five-bucket invariant across multiple players and bucket types", async function () {
+    const { owner, alice, bob, carol, game } = await loadFixture(deployFixture);
+
+    await game.connect(alice).deposit(usd(1_000));
+    await game.connect(bob).deposit(usd(500));
+    await game.connect(carol).deposit(usd(250));
+    await game.connect(owner).fundBankroll(usd(20_000));
+
+    await game.exposedDebitAvailable(alice.address, usd(100));
+    await game.exposedDebitAvailable(bob.address, usd(50));
+    await game.exposedReserveFromBankroll(alice.address, usd(300));
+    await game.exposedReserveFromBankroll(carol.address, usd(150));
+    await game.exposedReleaseReserve(carol.address, usd(25));
+
+    expect(await game.totalAvailable()).to.equal(usd(161_625) / 100n);
+    expect(await game.totalInPlay()).to.equal(usd(150));
+    expect(await game.totalReserved()).to.equal(usd(300));
+    expect(await game.bankroll()).to.equal(usd(19_675));
+    expect(await game.accruedFees()).to.equal(usd(875) / 100n);
+
+    await game.exposedAssertInvariant();
   });
 
   it("reverts on invalid internal helper operations", async function () {
@@ -288,23 +351,15 @@ describe("Vault", function () {
     expect(await game.availableBalanceOf(alice.address)).to.equal(usd(99_5) / 10n);
   });
 
-  it("keeps unimplemented phase 3/4 entrypoints explicitly reverting", async function () {
-    const { alice, bob, game } = await loadFixture(deployFixture);
+  it("keeps unimplemented phase 4 entrypoints explicitly reverting", async function () {
+    const { alice, game } = await loadFixture(deployFixture);
 
-    await expect(game.connect(alice).openSession()).to.be.revertedWith("Phase 3 not implemented");
-    await expect(game.connect(alice).closeSession()).to.be.revertedWith("Phase 3 not implemented");
-    await expect(game.connect(bob).expireSession(alice.address)).to.be.revertedWith("Phase 3 not implemented");
-    await expect(game.connect(alice).selfExclude()).to.be.revertedWith("Phase 3 not implemented");
-    await expect(game.connect(alice).requestSelfReinstatement()).to.be.revertedWith("Phase 3 not implemented");
-    await expect(game.connect(alice).completeSelfReinstatement()).to.be.revertedWith("Phase 3 not implemented");
-    await expect(game.connect(alice).operatorExclude(bob.address)).to.be.revertedWith("Phase 3 not implemented");
-    await expect(game.connect(alice).operatorReinstate(bob.address)).to.be.revertedWith("Phase 3 not implemented");
-    await expect(game.connect(alice).placeBet(0, usd(1))).to.be.revertedWith("Phase 3 not implemented");
+    await expect(game.connect(alice).openSession()).to.emit(game, "SessionOpened").withArgs(alice.address);
+    await expect(game.connect(alice).closeSession()).to.emit(game, "SessionClosed").withArgs(alice.address, 0n);
+
     await expect(game.connect(alice).placeIndexedBet(4, 0, usd(1))).to.be.revertedWith("Phase 4 not implemented");
-    await expect(game.connect(alice).removeBet(0)).to.be.revertedWith("Phase 3 not implemented");
     await expect(game.connect(alice).removeIndexedBet(0, 0)).to.be.revertedWith("Phase 4 not implemented");
     await expect(game.connect(alice).setPlaceWorking(4, true)).to.be.revertedWith("Phase 4 not implemented");
-    await expect(game.connect(alice).rollDice()).to.be.revertedWith("Phase 3 not implemented");
   });
 
   it("survives 50 deterministic random deposit and withdraw operations with the invariant checked on every step", async function () {

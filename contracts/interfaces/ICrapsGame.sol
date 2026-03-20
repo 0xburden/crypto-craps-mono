@@ -120,6 +120,7 @@ interface ICrapsGame {
     error BetUnavailable(BetType betType, PuckState puckState);
     error InsufficientBalance(uint256 available, uint256 requiredAmount);
     error InsufficientBankroll(uint256 bankroll, uint256 requiredReserve);
+    error PendingVRFRequestsOutstanding(uint256 pendingRequests);
     error PlayerExcluded(address player);
     error NotEligibleForReinstatement(uint256 eligibleAt);
 

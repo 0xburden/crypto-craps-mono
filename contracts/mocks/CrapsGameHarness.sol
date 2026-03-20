@@ -24,6 +24,10 @@ contract CrapsGameHarness is CrapsGame {
         _releaseReserve(player, paidOut);
     }
 
+    function exposedSetPendingVRFRequests(uint256 pendingVRFRequests_) external {
+        pendingVRFRequests = pendingVRFRequests_;
+    }
+
     function exposedAssertInvariant() external view {
         _assertInvariant();
     }

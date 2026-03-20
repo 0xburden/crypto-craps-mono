@@ -161,46 +161,46 @@ This is the vertical slice that validates the entire architecture before the ful
 
 | ID | Task | Subagent hint | Status |
 |----|------|---------------|--------|
-| 3.1 | Implement session lifecycle in `CrapsGame.sol` | Session agent | [ ] |
-| 3.1a | — Session struct: `phase` (enum), `point` (uint8), `lastActivityTime` (uint48), `pendingRequestId` (uint256) | Session agent | [ ] |
-| 3.1b | — `openSession()` — requires no active session, not excluded, not paused; sets `phase = COME_OUT`, `lastActivityTime = block.timestamp` | Session agent | [ ] |
-| 3.1c | — `closeSession()` — player-callable; requires `phase != ROLL_PENDING`; returns all `_inPlay` to `_available`, resets session struct | Session agent | [ ] |
-| 3.1d | — `expireSession(address player)` — callable by anyone; requires `block.timestamp - lastActivityTime > SESSION_TIMEOUT` (24 hours); handles `ROLL_PENDING` case (return `_inPlay` + release reserve → `_available`); deletes `requestToPlayer[pendingRequestId]` | Session agent | [ ] |
-| 3.1e | — Unit tests: `test/unit/Session.test.ts` — open, close, expire (active), expire (pending), expire-then-late-VRF-callback (must silently return) | Test agent | [ ] |
-| 3.2 | Implement self-exclusion system | Exclusion agent | [ ] |
-| 3.2a | — `selfExclude()` — sets `selfExcluded[msg.sender] = true`, closes any open session immediately, never blocks withdrawal | Exclusion agent | [ ] |
-| 3.2b | — `requestSelfReinstatement()` — records `reinstatementEligibleAt[msg.sender] = block.timestamp + 7 days` | Exclusion agent | [ ] |
-| 3.2c | — `completeSelfReinstatement()` — requires `block.timestamp >= reinstatementEligibleAt[msg.sender]`, clears exclusion | Exclusion agent | [ ] |
-| 3.2d | — `operatorExclude(address player)` / `operatorReinstate(address player)` — `onlyOwner` | Exclusion agent | [ ] |
-| 3.2e | — Unit tests: `test/unit/Exclusion.test.ts` — all four flows, withdrawal-still-works-while-excluded | Test agent | [ ] |
-| 3.3 | Implement Pass Line, Don't Pass, and Field bet placement | Betting agent | [ ] |
-| 3.3a | — `placeBet(BetType betType, uint256 amount)` — validates amount (min/max/required-multiple), puck state, session active and not pending; moves `_available → _inPlay` | Betting agent | [ ] |
-| 3.3b | — `removeBet(BetType betType)` — only for bets that may be taken down (Don't Pass line bets after point established); returns `_inPlay → _available` | Betting agent | [ ] |
-| 3.3c | — Validate bet availability by puck state (OFF vs ON) per PLAN.md §Puck Behavior | Betting agent | [ ] |
-| 3.4 | Implement `rollDice()` and VRF request path | VRF agent | [ ] |
-| 3.4a | — Require: session active, `phase != ROLL_PENDING`, at least one bet placed, not excluded | VRF agent | [ ] |
-| 3.4b | — Call `PayoutMath.maxPossiblePayout(activeBets, point)` and `_reserveFromBankroll(player, worstCase)` — revert with `InsufficientBankroll` if bankroll < worstCase | VRF agent | [ ] |
-| 3.4c | — Call `vrfCoordinator.requestRandomWords(...)`, store `requestToPlayer[requestId] = msg.sender`, set `session.pendingRequestId = requestId`, set `phase = ROLL_PENDING` | VRF agent | [ ] |
-| 3.5 | Implement `fulfillRandomWords()` VRF callback | VRF agent | [ ] |
-| 3.5a | — Look up player from `requestToPlayer`; if `address(0)`, silently return | VRF agent | [ ] |
-| 3.5b | — Derive two dice values: `die1 = (randomWord % 6) + 1`, `die2 = ((randomWord >> 8) % 6) + 1`, `sum = die1 + die2` | VRF agent | [ ] |
-| 3.5c | — Resolve Pass Line and Don't Pass according to come-out vs point phase rules; apply payout via `_releaseReserve` | VRF agent | [ ] |
-| 3.5d | — Resolve Field bet (win: 3,4,9,10,11; 2×: 2,12) | VRF agent | [ ] |
-| 3.5e | — Update puck state (COME_OUT→point established, point→COME_OUT on 7-out or point hit) | VRF agent | [ ] |
-| 3.5f | — Set `phase = COME_OUT` or `POINT` as appropriate; clear `pendingRequestId`; delete `requestToPlayer[requestId]`; update `lastActivityTime` | VRF agent | [ ] |
-| 3.5g | — **Zero reverts anywhere in this function.** Use soft returns, not `require`. | VRF agent | [ ] |
-| 3.6 | Implement `getPlayerState(address player)` view function | State agent | [ ] |
-| 3.6a | — Returns full `PlayerState` struct: session fields, all balance buckets, all bet slots, exclusion status, house context (`bankroll`, `totalBankroll`, `initialBankroll`, `paused`) | State agent | [ ] |
-| 3.7 | Unit tests: `test/unit/GameCore.test.ts` | Test agent | [ ] |
-| 3.7a | — Come-out: natural (7, 11) → Pass Line wins, Don't Pass loses | Test agent | [ ] |
-| 3.7b | — Come-out: craps (2, 3, 12) → Pass Line loses; Don't Pass wins on 2/3, push on 12 | Test agent | [ ] |
-| 3.7c | — Come-out: point established, then point hit → Pass Line wins | Test agent | [ ] |
-| 3.7d | — Come-out: point established, then 7-out → Pass Line loses, Don't Pass wins | Test agent | [ ] |
-| 3.7e | — Field wins on 3,4,9,10,11; Field 2:1 on 2; Field 2:1 on 12; Field loses on 5,6,7,8 | Test agent | [ ] |
-| 3.7f | — Reserve correctly computed before roll; released correctly after; invariant holds | Test agent | [ ] |
-| 3.7g | — Roll reverts with `InsufficientBankroll` when bankroll < worstCase | Test agent | [ ] |
-| 3.7h | — Late VRF callback after session expiry: no state change, no revert | Test agent | [ ] |
-| 3.7i | — `getPlayerState` returns correct values at each session phase | Test agent | [ ] |
+| 3.1 | Implement session lifecycle in `CrapsGame.sol` | Session agent | [x] |
+| 3.1a | — Session struct: `phase` (enum), `point` (uint8), `lastActivityTime` (uint48), `pendingRequestId` (uint256) | Session agent | [x] |
+| 3.1b | — `openSession()` — requires no active session, not excluded, not paused; sets `phase = COME_OUT`, `lastActivityTime = block.timestamp` | Session agent | [x] |
+| 3.1c | — `closeSession()` — player-callable; requires `phase != ROLL_PENDING`; returns all `_inPlay` to `_available`, resets session struct | Session agent | [x] |
+| 3.1d | — `expireSession(address player)` — callable by anyone; requires `block.timestamp - lastActivityTime > SESSION_TIMEOUT` (24 hours); handles `ROLL_PENDING` case (return `_inPlay` + release reserve → `_available`); deletes `requestToPlayer[pendingRequestId]` | Session agent | [x] |
+| 3.1e | — Unit tests: `test/unit/Session.test.ts` — open, close, expire (active), expire (pending), expire-then-late-VRF-callback (must silently return) | Test agent | [x] |
+| 3.2 | Implement self-exclusion system | Exclusion agent | [x] |
+| 3.2a | — `selfExclude()` — sets `selfExcluded[msg.sender] = true`, closes any open session immediately, never blocks withdrawal | Exclusion agent | [x] |
+| 3.2b | — `requestSelfReinstatement()` — records `reinstatementEligibleAt[msg.sender] = block.timestamp + 7 days` | Exclusion agent | [x] |
+| 3.2c | — `completeSelfReinstatement()` — requires `block.timestamp >= reinstatementEligibleAt[msg.sender]`, clears exclusion | Exclusion agent | [x] |
+| 3.2d | — `operatorExclude(address player)` / `operatorReinstate(address player)` — `onlyOwner` | Exclusion agent | [x] |
+| 3.2e | — Unit tests: `test/unit/Exclusion.test.ts` — all four flows, withdrawal-still-works-while-excluded | Test agent | [x] |
+| 3.3 | Implement Pass Line, Don't Pass, and Field bet placement | Betting agent | [x] |
+| 3.3a | — `placeBet(BetType betType, uint256 amount)` — validates amount (min/max/required-multiple), puck state, session active and not pending; moves `_available → _inPlay` | Betting agent | [x] |
+| 3.3b | — `removeBet(BetType betType)` — only for bets that may be taken down (Don't Pass line bets after point established); returns `_inPlay → _available` | Betting agent | [x] |
+| 3.3c | — Validate bet availability by puck state (OFF vs ON) per PLAN.md §Puck Behavior | Betting agent | [x] |
+| 3.4 | Implement `rollDice()` and VRF request path | VRF agent | [x] |
+| 3.4a | — Require: session active, `phase != ROLL_PENDING`, at least one bet placed, not excluded | VRF agent | [x] |
+| 3.4b | — Call `PayoutMath.maxPossiblePayout(activeBets, point)` and `_reserveFromBankroll(player, worstCase)` — revert with `InsufficientBankroll` if bankroll < worstCase | VRF agent | [x] |
+| 3.4c | — Call `vrfCoordinator.requestRandomWords(...)`, store `requestToPlayer[requestId] = msg.sender`, set `session.pendingRequestId = requestId`, set `phase = ROLL_PENDING` | VRF agent | [x] |
+| 3.5 | Implement `fulfillRandomWords()` VRF callback | VRF agent | [x] |
+| 3.5a | — Look up player from `requestToPlayer`; if `address(0)`, silently return | VRF agent | [x] |
+| 3.5b | — Derive two dice values: `die1 = (randomWord % 6) + 1`, `die2 = ((randomWord >> 8) % 6) + 1`, `sum = die1 + die2` | VRF agent | [x] |
+| 3.5c | — Resolve Pass Line and Don't Pass according to come-out vs point phase rules; apply payout via `_releaseReserve` | VRF agent | [x] |
+| 3.5d | — Resolve Field bet (win: 3,4,9,10,11; 2×: 2,12) | VRF agent | [x] |
+| 3.5e | — Update puck state (COME_OUT→point established, point→COME_OUT on 7-out or point hit) | VRF agent | [x] |
+| 3.5f | — Set `phase = COME_OUT` or `POINT` as appropriate; clear `pendingRequestId`; delete `requestToPlayer[requestId]`; update `lastActivityTime` | VRF agent | [x] |
+| 3.5g | — **Zero reverts anywhere in this function.** Use soft returns, not `require`. | VRF agent | [x] |
+| 3.6 | Implement `getPlayerState(address player)` view function | State agent | [x] |
+| 3.6a | — Returns full `PlayerState` struct: session fields, all balance buckets, all bet slots, exclusion status, house context (`bankroll`, `totalBankroll`, `initialBankroll`, `paused`) | State agent | [x] |
+| 3.7 | Unit tests: `test/unit/GameCore.test.ts` | Test agent | [x] |
+| 3.7a | — Come-out: natural (7, 11) → Pass Line wins, Don't Pass loses | Test agent | [x] |
+| 3.7b | — Come-out: craps (2, 3, 12) → Pass Line loses; Don't Pass wins on 2/3, push on 12 | Test agent | [x] |
+| 3.7c | — Come-out: point established, then point hit → Pass Line wins | Test agent | [x] |
+| 3.7d | — Come-out: point established, then 7-out → Pass Line loses, Don't Pass wins | Test agent | [x] |
+| 3.7e | — Field wins on 3,4,9,10,11; Field 2:1 on 2; Field 2:1 on 12; Field loses on 5,6,7,8 | Test agent | [x] |
+| 3.7f | — Reserve correctly computed before roll; released correctly after; invariant holds | Test agent | [x] |
+| 3.7g | — Roll reverts with `InsufficientBankroll` when bankroll < worstCase | Test agent | [x] |
+| 3.7h | — Late VRF callback after session expiry: no state change, no revert | Test agent | [x] |
+| 3.7i | — `getPlayerState` returns correct values at each session phase | Test agent | [x] |
 
 **VRF configuration constants:**
 ```solidity
