@@ -1,0 +1,8 @@
+{
+  "execution-timeout": 120,
+  "solv": "0.8.24",
+  "targets": [
+    "contracts/CrapsGame.sol"
+  ],
+  "notes": "Phase 0 stub; update targets when core contracts exist."
+}

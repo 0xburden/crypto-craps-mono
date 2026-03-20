@@ -1,0 +1,28 @@
+{
+  "name": "crypto-craps",
+  "version": "1.0.0",
+  "description": "On-chain craps on BASE",
+  "private": true,
+  "scripts": {
+    "clean": "hardhat clean",
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "coverage": "hardhat coverage",
+    "node": "hardhat node"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ignition": "^0.15",
+    "@nomicfoundation/hardhat-ignition-ethers": "^0.15",
+    "@nomicfoundation/hardhat-toolbox": "^5",
+    "hardhat": "^2.22",
+    "hardhat-gas-reporter": "^2",
+    "solidity-coverage": "^0.8",
+    "ts-node": "^10.9",
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@chainlink/contracts": "^1.2",
+    "@openzeppelin/contracts": "^5.1",
+    "dotenv": "^16.4.7"
+  }
+}
