@@ -10,7 +10,12 @@
     "test": "HARDHAT_SOURCES=./test/solidity hardhat test",
     "coverage": "HARDHAT_SOURCES=./test/solidity TS_NODE_CACHE=false DISABLE_V8_COMPILE_CACHE=1 hardhat coverage",
     "coverage:vault": "HARDHAT_SOURCES=./test/solidity TS_NODE_CACHE=false DISABLE_V8_COMPILE_CACHE=1 hardhat coverage --testfiles 'test/unit/Vault.test.ts' && node scripts/check-vault-coverage.mjs",
-    "node": "hardhat node"
+    "node": "hardhat node",
+    "deploy:hardhat": "hardhat ignition deploy ignition/modules/CrapsGame.ts --network hardhat --deployment-id hardhat-local --write-localhost-deployment && CRAPS_DEPLOYMENT_ID=hardhat-local CRAPS_EXPORT_OUT=deployments/hardhat-deployment.json hardhat run scripts/export-deployment.ts --network hardhat",
+    "deploy:sepolia": "CRAPS_USE_MOCKS=false CRAPS_DEPLOYMENT_ID=sepolia hardhat ignition deploy ignition/modules/CrapsGame.ts --network baseSepolia --deployment-id sepolia --parameters deployments/sepolia-params.json && CRAPS_USE_MOCKS=false CRAPS_DEPLOYMENT_ID=sepolia CRAPS_EXPORT_PARAMS=deployments/sepolia-params.json CRAPS_EXPORT_OUT=deployments/sepolia-deployment.json hardhat run scripts/export-deployment.ts --network baseSepolia",
+    "deploy:mainnet": "CRAPS_USE_MOCKS=false CRAPS_DEPLOYMENT_ID=mainnet hardhat ignition deploy ignition/modules/CrapsGame.ts --network base --deployment-id mainnet --parameters deployments/mainnet-params.json && CRAPS_USE_MOCKS=false CRAPS_DEPLOYMENT_ID=mainnet CRAPS_EXPORT_PARAMS=deployments/mainnet-params.json CRAPS_EXPORT_OUT=deployments/mainnet-deployment.json hardhat run scripts/export-deployment.ts --network base",
+    "verify:sepolia": "CRAPS_VERIFY_DEPLOYMENT=deployments/sepolia-deployment.json hardhat run scripts/verify.ts --network baseSepolia",
+    "verify:mainnet": "CRAPS_VERIFY_DEPLOYMENT=deployments/mainnet-deployment.json hardhat run scripts/verify.ts --network base"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ignition": "^0.15",

@@ -9,7 +9,7 @@ contract PayoutMathHarness {
         ICrapsGame.BetType betType,
         uint8 point
     ) external pure returns (uint256 numerator, uint256 denominator) {
-        return PayoutMath.payoutMultiplier(betType, point);
+        (numerator, denominator) = PayoutMath.payoutMultiplier(betType, point);
     }
 
     function maxPossiblePayout(

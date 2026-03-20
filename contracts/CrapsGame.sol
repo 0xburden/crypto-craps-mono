@@ -253,7 +253,8 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
         if (!selfExcluded[msg.sender]) revert NotEligibleForReinstatement(0);
 
         uint256 eligibleAt = reinstatementEligibleAt[msg.sender];
-        if (eligibleAt == 0 || block.timestamp < eligibleAt) revert NotEligibleForReinstatement(eligibleAt);
+        if (eligibleAt < 1) revert NotEligibleForReinstatement(0);
+        if (block.timestamp < eligibleAt) revert NotEligibleForReinstatement(eligibleAt);
 
         selfExcluded[msg.sender] = false;
         reinstatementEligibleAt[msg.sender] = 0;
@@ -533,20 +534,24 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
     }
 
     function rollDice() external override whenNotPaused notExcluded nonReentrant returns (uint256 requestId) {
-        _trackPlayer(msg.sender);
+        address player = msg.sender;
+        _trackPlayer(player);
 
-        SessionData storage session = _sessions[msg.sender];
+        SessionData storage session = _sessions[player];
         _requireSessionReady(session);
 
-        if (_inPlay[msg.sender] == 0) revert InvalidAmount(0);
+        if (_inPlay[player] == 0) revert InvalidAmount(0);
 
         BetSlots memory activeBets = session.bets;
         uint256 worstCase = PayoutMath.maxPossiblePayout(activeBets, session.point);
         if (worstCase > bankroll) revert InsufficientBankroll(bankroll, worstCase);
 
         if (worstCase != 0) {
-            _reserveFromBankroll(msg.sender, worstCase);
+            _reserveFromBankroll(player, worstCase);
         }
+
+        session.phase = SessionPhase.ROLL_PENDING;
+        pendingVRFRequests += 1;
 
         VRFV2PlusClient.RandomWordsRequest memory request = VRFV2PlusClient.RandomWordsRequest({
             keyHash: vrfKeyHash,
@@ -557,13 +562,12 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
             extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: false}))
         });
 
+        // slither-disable-next-line reentrancy-no-eth,reentrancy-benign
         requestId = s_vrfCoordinator.requestRandomWords(request);
-        requestToPlayer[requestId] = msg.sender;
+        requestToPlayer[requestId] = player;
         session.pendingRequestId = requestId;
-        session.phase = SessionPhase.ROLL_PENDING;
-        pendingVRFRequests += 1;
 
-        emit RollRequested(msg.sender, requestId, worstCase);
+        emit RollRequested(player, requestId, worstCase);
         _assertInvariantIfNeeded();
     }
 
@@ -729,9 +733,41 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
         if (flatAmount == 0) revert InvalidAmount(addedAmount);
         if (newTotal > flatAmount * MAX_ODDS_MULTIPLIER) revert InvalidAmount(newTotal);
 
-        (, uint256 denominator) = PayoutMath.payoutMultiplier(betType, point);
-        if (denominator == 0) revert InvalidPoint(point);
-        if (denominator > 1 && newTotal % denominator != 0) revert InvalidMultiple(newTotal, denominator);
+        uint256 requiredMultiple = _oddsBetRequiredMultiple(betType, point);
+        if (requiredMultiple > 1 && newTotal % requiredMultiple != 0) {
+            revert InvalidMultiple(newTotal, requiredMultiple);
+        }
+    }
+
+    function _oddsBetRequiredMultiple(BetType betType, uint8 point) internal pure returns (uint256 requiredMultiple) {
+        if (point == 4 || point == 10) {
+            if (betType == BetType.PASS_LINE_ODDS || betType == BetType.COME_ODDS) {
+                return 1;
+            }
+            if (betType == BetType.DONT_PASS_ODDS || betType == BetType.DONT_COME_ODDS) {
+                return 2;
+            }
+        }
+
+        if (point == 5 || point == 9) {
+            if (betType == BetType.PASS_LINE_ODDS || betType == BetType.COME_ODDS) {
+                return 2;
+            }
+            if (betType == BetType.DONT_PASS_ODDS || betType == BetType.DONT_COME_ODDS) {
+                return 3;
+            }
+        }
+
+        if (point == 6 || point == 8) {
+            if (betType == BetType.PASS_LINE_ODDS || betType == BetType.COME_ODDS) {
+                return 5;
+            }
+            if (betType == BetType.DONT_PASS_ODDS || betType == BetType.DONT_COME_ODDS) {
+                return 6;
+            }
+        }
+
+        revert InvalidPoint(point);
     }
 
     function _findOpenLineBetSlot(Bet[4] storage bets) internal view returns (uint8 slotIndex) {
@@ -754,7 +790,7 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
         revert InvalidPoint(placeNumber);
     }
 
-    function _placeBetStorage(BetSlots storage bets, BetType betType) internal view returns (PlaceBet storage placeSlot) {
+    function _placeBetStorage(BetSlots storage bets, BetType betType) internal view returns (PlaceBet storage) {
         if (betType == BetType.PLACE_4) return bets.place4;
         if (betType == BetType.PLACE_5) return bets.place5;
         if (betType == BetType.PLACE_6) return bets.place6;
@@ -767,7 +803,7 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
     function _hardwayBetStorage(BetSlots storage bets, BetType betType)
         internal
         view
-        returns (HardwayBet storage hardwayBet)
+        returns (HardwayBet storage)
     {
         if (betType == BetType.HARD_4) return bets.hard4;
         if (betType == BetType.HARD_6) return bets.hard6;
@@ -1093,7 +1129,7 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
             return (0, 0, 0);
         }
 
-        bool wins;
+        bool wins = false;
         if (betType == BetType.ANY_7) {
             wins = sum == 7;
         } else if (betType == BetType.ANY_CRAPS) {
@@ -1118,9 +1154,9 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
     }
 
     function _assertInvariant() internal view {
-        uint256 sumAvailable;
-        uint256 sumInPlay;
-        uint256 sumReserved;
+        uint256 sumAvailable = 0;
+        uint256 sumInPlay = 0;
+        uint256 sumReserved = 0;
         uint256 trackedPlayerCount = _trackedPlayers.length;
 
         for (uint256 i = 0; i < trackedPlayerCount; ++i) {
@@ -1133,6 +1169,7 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
         assert(sumAvailable == totalAvailable);
         assert(sumInPlay == totalInPlay);
         assert(sumReserved == totalReserved);
+        // slither-disable-next-line incorrect-equality
         assert(i_token.balanceOf(address(this)) == sumAvailable + sumInPlay + sumReserved + bankroll + accruedFees);
     }
 
@@ -1216,9 +1253,9 @@ contract CrapsGame is ICrapsGame, VRFConsumerBaseV2Plus, Pausable, ReentrancyGua
         uint8 die2 = uint8(((randomWord >> 8) % 6) + 1);
         uint8 sum = die1 + die2;
 
-        uint256 returnedToAvailable;
-        uint256 lostToBankroll;
-        uint256 payout;
+        uint256 returnedToAvailable = 0;
+        uint256 lostToBankroll = 0;
+        uint256 payout = 0;
 
         Bet storage passLine = session.bets.passLine;
         if (passLine.amount != 0) {

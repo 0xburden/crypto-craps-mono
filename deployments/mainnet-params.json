@@ -1,0 +1,11 @@
+{
+  "CrapsGameModule": {
+    "tokenAddress": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "vrfCoordinator": "0xd5D517aBE5cF79B7e95eC98dB0f0277788aFF634",
+    "subscriptionId": "0",
+    "keyHash": "0x00456d8a57dbabf4e48f22dfb60c6c4e5f82b81c3d1ecc28b98f4c67e0a2f9b9",
+    "tokenDecimals": 6,
+    "initialBankrollAmount": "50000000000",
+    "debug": false
+  }
+}

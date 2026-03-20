@@ -296,15 +296,15 @@ internal functions — only `MockERC20` and `MockVRFCoordinator` are permitted.
 
 | ID | Task | Subagent hint | Status |
 |----|------|---------------|--------|
-| 6.1 | Implement `ignition/modules/CrapsGame.ts` — Ignition module that: deploys `CrapsGame` with constructor params (token address, VRF coordinator, subscription ID, key hash, token decimals), transfers `INITIAL_BANKROLL_AMOUNT` from deployer to contract via `fundBankroll`, emits deployment parameters to `deployments/` directory | Deploy agent | [ ] |
-| 6.2 | Implement `scripts/verify.ts` — post-deployment Basescan verification script that reads deployment artifact and calls Hardhat verify task | Deploy agent | [ ] |
-| 6.3 | Document BASE Sepolia deployment parameters in `deployments/sepolia-params.json` | Deploy agent | [ ] |
-| 6.3a | — VRF Coordinator v2.5: `0x5C210eF41CD1a72de73bF76eC39637bB0d3d7BEE` | Deploy agent | [ ] |
-| 6.3b | — LINK token (Sepolia): `0xE4aB69C077896252FAFBD49EFD26B5D171A32410` | Deploy agent | [ ] |
-| 6.3c | — USDC (BASE Sepolia, Circle): `0x036CbD53842c5426634e7929541eC2318f3dCF7e` | Deploy agent | [ ] |
-| 6.3d | — Key hash (BASE Sepolia, 30 gwei lane): `0x9e9e46732b32662b9adc6f3abdf6c5e926a666d6b7a39d3a50b33ff4f6f56f9` | Deploy agent | [ ] |
-| 6.4 | Create VRF subscription setup guide in `docs/vrf-setup.md` — how to create subscription on vrf.chain.link, add consumer contract address, fund with LINK | Docs agent | [ ] |
-| 6.5 | Add `npm run deploy:sepolia` and `npm run deploy:mainnet` scripts to `package.json` | Deploy agent | [ ] |
+| 6.1 | Implement `ignition/modules/CrapsGame.ts` — Ignition module that: deploys `CrapsGame` with constructor params (token address, VRF coordinator, subscription ID, key hash, token decimals), transfers `INITIAL_BANKROLL_AMOUNT` from deployer to contract via `fundBankroll`, emits deployment parameters to `deployments/` directory | Deploy agent | [x] |
+| 6.2 | Implement `scripts/verify.ts` — post-deployment Basescan verification script that reads deployment artifact and calls Hardhat verify task | Deploy agent | [x] |
+| 6.3 | Document BASE Sepolia deployment parameters in `deployments/sepolia-params.json` | Deploy agent | [x] |
+| 6.3a | — VRF Coordinator v2.5: `0x5C210eF41CD1a72de73bF76eC39637bB0d3d7BEE` | Deploy agent | [x] |
+| 6.3b | — LINK token (Sepolia): `0xE4aB69C077896252FAFBD49EFD26B5D171A32410` | Deploy agent | [x] |
+| 6.3c | — USDC (BASE Sepolia, Circle): `0x036CbD53842c5426634e7929541eC2318f3dCF7e` | Deploy agent | [x] |
+| 6.3d | — Key hash (BASE Sepolia, 30 gwei lane): `0x9e9e46732b32662b9adc6f3abdf6c5e926a666d6b7a39d3a50b33ff4f6f56f9` | Deploy agent | [x] |
+| 6.4 | Create VRF subscription setup guide in `docs/vrf-setup.md` — how to create subscription on vrf.chain.link, add consumer contract address, fund with LINK | Docs agent | [x] |
+| 6.5 | Add `npm run deploy:sepolia` and `npm run deploy:mainnet` scripts to `package.json` | Deploy agent | [x] |
 
 **Phase 6 exit criteria:**
 - `npx hardhat ignition deploy ignition/modules/CrapsGame.ts --network hardhat` completes without error
@@ -321,21 +321,21 @@ deploys until Slither and Mythril pass with no high/critical findings.
 
 | ID | Task | Subagent hint | Status |
 |----|------|---------------|--------|
-| 7.1 | Run Slither: `slither . --config-file slither.config.json` — fix all High and Medium findings; document any acknowledged Low findings with rationale in `audit/slither-notes.md` | Security agent | [ ] |
-| 7.2 | Run Mythril: `myth analyze contracts/CrapsGame.sol --execution-timeout 120` — fix all detected vulnerabilities; document analysis in `audit/mythril-notes.md` | Security agent | [ ] |
-| 7.3 | Manual security review checklist — complete `audit/security-checklist.md` covering: | Security agent | [ ] |
-| 7.3a | — Reentrancy: all vault mutations guarded by `ReentrancyGuard` | Security agent | [ ] |
-| 7.3b | — VRF manipulation: only VRF coordinator can call `fulfillRandomWords` (verify `onlyVRFCoordinator` modifier) | Security agent | [ ] |
-| 7.3c | — Callback revert impossibility: grep for `require`/`revert` inside `fulfillRandomWords` (must be zero) | Security agent | [ ] |
-| 7.3d | — Access control: `onlyOwner` on all administrative functions | Security agent | [ ] |
-| 7.3e | — Integer overflow: all arithmetic uses Solidity `^0.8.24` built-in overflow protection | Security agent | [ ] |
-| 7.3f | — No floating point: `PayoutMath.sol` uses only integer arithmetic | Security agent | [ ] |
-| 7.3g | — Invariant: manual trace through deposit → bet → roll → fulfill → withdraw confirms no bucket leakage | Security agent | [ ] |
-| 7.3h | — Exclusion: excluded players cannot bypass via `openSession` or `placeBet` | Security agent | [ ] |
-| 7.3i | — Withdrawal: `paused()` does NOT block `withdraw()` | Security agent | [ ] |
-| 7.4 | Gas optimization pass — review `fulfillRandomWords` and `rollDice` for: storage read/write minimization, event emission efficiency, unnecessary SLOAD in loops | Gas agent | [ ] |
-| 7.5 | Re-run full test suite post-optimization; confirm no regressions | Test agent | [ ] |
-| 7.6 | Update `gas-report-baseline.json` with optimized figures | Gas agent | [ ] |
+| 7.1 | Run Slither: `slither . --config-file slither.config.json` — fix all High and Medium findings; document any acknowledged Low findings with rationale in `audit/slither-notes.md` | Security agent | [x] |
+| 7.2 | Run Mythril: `myth analyze contracts/CrapsGame.sol --execution-timeout 120` — fix all detected vulnerabilities; document analysis in `audit/mythril-notes.md` | Security agent | [x] |
+| 7.3 | Manual security review checklist — complete `audit/security-checklist.md` covering: | Security agent | [x] |
+| 7.3a | — Reentrancy: all vault mutations guarded by `ReentrancyGuard` | Security agent | [x] |
+| 7.3b | — VRF manipulation: only VRF coordinator can call `fulfillRandomWords` (verify `onlyVRFCoordinator` modifier) | Security agent | [x] |
+| 7.3c | — Callback revert impossibility: grep for `require`/`revert` inside `fulfillRandomWords` (must be zero) | Security agent | [x] |
+| 7.3d | — Access control: `onlyOwner` on all administrative functions | Security agent | [x] |
+| 7.3e | — Integer overflow: all arithmetic uses Solidity `^0.8.24` built-in overflow protection | Security agent | [x] |
+| 7.3f | — No floating point: `PayoutMath.sol` uses only integer arithmetic | Security agent | [x] |
+| 7.3g | — Invariant: manual trace through deposit → bet → roll → fulfill → withdraw confirms no bucket leakage | Security agent | [x] |
+| 7.3h | — Exclusion: excluded players cannot bypass via `openSession` or `placeBet` | Security agent | [x] |
+| 7.3i | — Withdrawal: `paused()` does NOT block `withdraw()` | Security agent | [x] |
+| 7.4 | Gas optimization pass — review `fulfillRandomWords` and `rollDice` for: storage read/write minimization, event emission efficiency, unnecessary SLOAD in loops | Gas agent | [x] |
+| 7.5 | Re-run full test suite post-optimization; confirm no regressions | Test agent | [x] |
+| 7.6 | Update `gas-report-baseline.json` with optimized figures | Gas agent | [x] |
 
 **Phase 7 exit criteria:**
 - Slither: zero High/Critical findings
