@@ -1,8 +1,12 @@
 {
   "execution-timeout": 120,
   "solv": "0.8.24",
+  "runner": "auto",
+  "dockerImage": "mythril/myth",
+  "solcJson": "audit/mythril-solc-settings.json",
+  "reportPath": "audit/reports/mythril-report.json",
   "targets": [
     "contracts/CrapsGame.sol"
   ],
-  "notes": "Phase 0 stub; update targets when core contracts exist."
+  "notes": "Phase 7 reproducible Mythril configuration for repo-local reruns and CI gating."
 }

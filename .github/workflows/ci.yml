@@ -19,3 +19,46 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm compile
       - run: pnpm test
+
+  slither:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit:slither
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: slither-report
+          path: audit/reports/slither-report.json
+          if-no-files-found: warn
+
+  mythril:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: MYTHRIL_RUNNER=docker pnpm audit:mythril
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mythril-report
+          path: audit/reports/mythril-report.json
+          if-no-files-found: warn

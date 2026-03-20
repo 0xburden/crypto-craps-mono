@@ -85,4 +85,10 @@ Phase 7 manual review of `contracts/CrapsGame.sol` and related runtime paths.
 - Static analysis gate status:
   - Slither: **0 High/Critical, 0 Medium**
   - Mythril: **0 issues detected**
+- Reproducible security commands:
+  - `pnpm audit:slither`
+  - `pnpm audit:mythril`
+  - `pnpm audit:phase7`
+- Runbook: `docs/security-running.md`
+- CI now enforces the static-analysis gate and uploads the generated reports from `audit/reports/`.
 - Post-review full suite status: **passing**

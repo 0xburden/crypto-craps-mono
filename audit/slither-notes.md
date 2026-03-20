@@ -1,14 +1,28 @@
 # Slither Notes
 
-## Command
+## Recommended command
 
 ```bash
-uvx --python 3.11 --from slither-analyzer slither . --config-file slither.config.json
+pnpm audit:slither
 ```
 
-A JSON run was also used to confirm detector impact levels after fixes.
+See also: `docs/security-running.md`
+
+This runs `scripts/run-slither.mjs`, which executes Slither with `slither.config.json`, writes the raw JSON report to `audit/reports/slither-report.json`, and enforces the Phase 7 gate on severity:
+
+- fail on any **High** finding
+- fail on any **Medium** finding
+- allow documented **Low** / **Informational** findings
+
+Equivalent underlying analyzer invocation:
+
+```bash
+uvx --python 3.11 --from slither-analyzer slither . --config-file slither.config.json --json -
+```
 
 ## Result
+
+Severity classification is taken from the generated JSON report.
 
 - **High findings:** 0
 - **Medium findings:** 0
@@ -54,4 +68,4 @@ A JSON run was also used to confirm detector impact levels after fixes.
 
 ## Conclusion
 
-Slither now reports **zero High/Critical** and **zero Medium** findings for the repository under the configured run.
+Slither now reports **zero High/Critical** and **zero Medium** findings, and the CI/static-analysis gate is wired to fail if that changes.

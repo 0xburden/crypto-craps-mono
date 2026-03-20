@@ -1,0 +1,11 @@
+{
+  "optimizer": {
+    "enabled": true,
+    "runs": 1
+  },
+  "viaIR": true,
+  "remappings": [
+    "@openzeppelin/=node_modules/@openzeppelin/",
+    "@chainlink/=node_modules/@chainlink/"
+  ]
+}

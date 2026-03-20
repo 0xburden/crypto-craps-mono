@@ -4,5 +4,6 @@ cache/
 coverage/
 typechain-types/
 dist/
+audit/reports/
 .env
 *.tsbuildinfo

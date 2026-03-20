@@ -1,21 +1,38 @@
 # Mythril Notes
 
-## Environment notes
-
-Mythril required a local Python 3.11 virtualenv with `setuptools<81` so the legacy `pkg_resources` import path remained available.
-The direct Docker image path was not usable for source analysis on this machine because Mythril's internal `solc` bootstrap hit an architecture issue.
-
-## Successful command
+## Recommended command
 
 ```bash
-source /tmp/mythril-venv/bin/activate
-myth analyze contracts/CrapsGame.sol \
-  --execution-timeout 120 \
-  --solc-json /tmp/myth-solc-settings.json \
-  --solc-args "--base-path . --include-path node_modules --allow-paths .,$PWD/node_modules"
+pnpm audit:mythril
 ```
 
-Where `/tmp/myth-solc-settings.json` contained:
+See also: `docs/security-running.md`
+
+This runs `scripts/run-mythril.mjs`, which reads `mythril.config.json`, uses the committed compiler settings in `audit/mythril-solc-settings.json`, writes the JSON report to `audit/reports/mythril-report.json`, and fails the Phase 7 gate if any issue is detected.
+
+Runner selection:
+
+- `runner: auto` in `mythril.config.json` prefers a local `myth` binary when available
+- CI forces `MYTHRIL_RUNNER=docker`
+- local overrides are supported via `MYTHRIL_RUNNER=local` or `MYTHRIL_RUNNER=docker`
+
+A reproducible local setup is:
+
+```bash
+python3.11 -m venv /tmp/mythril-venv
+source /tmp/mythril-venv/bin/activate
+pip install 'setuptools<81' 'mythril==0.24.8'
+pnpm audit:mythril
+```
+
+## Repo-local configuration
+
+Committed files used by the script:
+
+- `mythril.config.json`
+- `audit/mythril-solc-settings.json`
+
+The analysis uses project-matching compiler settings:
 
 ```json
 {
@@ -28,11 +45,27 @@ Where `/tmp/myth-solc-settings.json` contained:
 }
 ```
 
+## Effective analyzer command
+
+The wrapper runs the equivalent of:
+
+```bash
+myth analyze contracts/CrapsGame.sol \
+  --execution-timeout 120 \
+  --solv 0.8.24 \
+  --solc-json audit/mythril-solc-settings.json \
+  --solc-args "--base-path . --include-path node_modules --allow-paths .,$PWD/node_modules" \
+  -o jsonv2
+```
+
+On CI, the same command is executed through the `mythril/myth` Docker image with `/src`-scoped paths.
+
 ## Result
 
-Mythril completed successfully and reported:
+Mythril completed successfully and reported no issues.
 
-> The analysis was completed successfully. No issues were detected.
+- **Vulnerabilities detected:** 0
+- **Target analyzed:** `contracts/CrapsGame.sol`
 
 ## Interpretation
 
@@ -40,10 +73,6 @@ Mythril completed successfully and reported:
 - This result is consistent with the existing full test suite plus the additional Slither cleanup done in Phase 7.
 - The contract still deserves normal pre-deployment human review, but Mythril did not identify exploitable paths in this pass.
 
-## Follow-up
+## Conclusion
 
-If this analysis is repeated in CI or another environment, prefer:
-- Python 3.11
-- `setuptools<81`
-- explicit solc remappings for `@openzeppelin` and `@chainlink`
-- matching `viaIR`/optimizer settings with `hardhat.config.ts`
+Mythril is now reproducible from committed repo state and participates in CI as an actual deployment gate.
