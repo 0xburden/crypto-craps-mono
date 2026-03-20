@@ -102,6 +102,7 @@ interface ICrapsGame {
         uint256 accruedFees;
         bool paused;
         bool selfExcluded;
+        bool operatorExcluded;
         uint256 reinstatementEligibleAt;
         BetSlots bets;
     }

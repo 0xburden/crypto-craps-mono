@@ -82,16 +82,11 @@ Each player has their own independent session. There is no shared table — just
 struct Session {
     SessionPhase phase;        // INACTIVE, COME_OUT, POINT, ROLL_PENDING
     uint8 point;               // 0 if no point established, else 4/5/6/8/9/10
-    uint256 vrfRequestId;      // Active VRF request (0 if none)
-    uint256 lastActivityTime;  // block.timestamp of last roll resolution (for 24h expiry)
+    uint256 pendingRequestId;  // Active VRF request (0 if none)
+    uint48 lastActivityTime;   // last roll resolution / session activity (24h expiry clock)
 
     // Fixed-size bet storage — zero amount means no bet
-    Bet passLine;
-    Bet dontPass;
-    ComeBet[4] comeBets;       // Max 4 concurrent Come/Don't Come bets
-    PlaceBet[6] placeBets;     // Indexed: [4, 5, 6, 8, 9, 10]
-    HardwayBet[4] hardways;    // Indexed: [4, 6, 8, 10]
-    OneRollBets oneRolls;      // Struct: field, any7, anyCraps, yo, hiLo, aces, boxcars
+    BetSlots bets;
 }
 ```
 
@@ -101,47 +96,59 @@ struct Session {
 
 ```solidity
 struct Bet {
-    uint256 amount;         // 0 means no bet
-    uint256 oddsAmount;     // Attached odds bet amount (0 if none). Used for Pass/Don't Pass only
-}
-
-struct ComeBet {
-    uint256 amount;         // Base Come/Don't Come amount (0 means empty slot)
-    uint256 oddsAmount;     // Attached Come/Don't Come Odds (0 if none)
-    uint8 point;            // 0 = COME_PENDING (no point yet), 4/5/6/8/9/10 = established point
-    bool isDontCome;        // false = Come bet, true = Don't Come bet
+    uint256 amount;      // 0 means no bet
+    uint256 oddsAmount;  // attached odds amount (0 if none)
+    uint8 point;         // 0 while pending/traveling; 4/5/6/8/9/10 once established
 }
 
 struct PlaceBet {
-    uint256 amount;         // 0 means no bet
-    bool active;            // ON/OFF toggle. Only affects win resolution; a 7 kills regardless
+    uint256 amount;      // 0 means no bet
+    bool working;        // ON/OFF toggle. A 7 still kills all place bets regardless
 }
 
 struct HardwayBet {
-    uint256 amount;         // 0 means no bet
+    uint256 amount;
 }
 
 struct OneRollBets {
     uint256 field;
     uint256 any7;
     uint256 anyCraps;
+    uint256 craps2;
+    uint256 craps3;
     uint256 yo;
-    uint256 hiLo;
-    uint256 aces;
-    uint256 boxcars;
+    uint256 twelve;
+    uint256 horn;
+}
+
+struct BetSlots {
+    Bet passLine;
+    Bet dontPass;
+    Bet[4] come;
+    Bet[4] dontCome;
+    PlaceBet place4;
+    PlaceBet place5;
+    PlaceBet place6;
+    PlaceBet place8;
+    PlaceBet place9;
+    PlaceBet place10;
+    HardwayBet hard4;
+    HardwayBet hard6;
+    HardwayBet hard8;
+    HardwayBet hard10;
+    OneRollBets oneRolls;
 }
 ```
 
 **Notes:**
-- `Bet` is used for both Pass Line and Don't Pass. The session has separate `passLine` and `dontPass` fields, so the type is implicit from the field name.
-- `ComeBet.isDontCome` distinguishes Come from Don't Come within the same array. Both share the 4-slot `comeBets` array.
-- `PlaceBet.active` is the ON/OFF toggle. Defaults to OFF when first placed during puck OFF phase.
-- All `amount` fields are in token units (scaled to `tokenDecimals`).
+- `Bet` is used for line bets and for each Come / Don't Come slot.
+- `Bet.point == 0` means the Come / Don't Come bet is still pending/traveling.
+- `PlaceBet.working` is the ON/OFF toggle. Defaults to OFF when first placed during puck OFF phase.
+- All `amount` fields are denominated in the deployment token's smallest units.
 
-**Index-to-number mappings:**
-- `placeBets[0..5]` → numbers `[4, 5, 6, 8, 9, 10]` (note the gap at 7)
-- `hardways[0..3]` → targets `[4, 6, 8, 10]`
-- `comeBets[0..3]` → first empty slot (amount == 0) is used when a new Come bet is placed
+**Index usage:**
+- `come[0..3]` and `dontCome[0..3]` are the four fixed Come / Don't Come slots.
+- place bets and hardways are selected by explicit `BetType` rather than array position.
 
 #### Session Lifecycle
 
@@ -253,9 +260,8 @@ A 7 is rolled while the puck is ON. This is the single most complex resolution b
 | Any 7 | **Wins** | Pays 4:1 |
 | Any Craps | **Loses** | 7 is not 2, 3, or 12 |
 | Yo | **Loses** | 7 is not 11 |
-| Hi-Lo | **Loses** | 7 is not 2 or 12 |
-| Aces | **Loses** | |
-| Boxcars | **Loses** | |
+| Craps 2 / Craps 3 / Twelve | **Loses** | 7 is not 2, 3, or 12 |
+| Horn | **Loses** | 7 is not 2, 3, 11, or 12 |
 
 **After resolution:** Point resets to 0. Puck goes OFF. Phase becomes COME_OUT. All bet slots should be cleared (no bets survive a seven-out).
 
@@ -357,11 +363,12 @@ else:
 |---|---|
 | Pass Line | **Loses** |
 | Don't Pass | **Pushes.** No action |
-| Field | **Wins** at 3:1 |
+| Field | **Wins** at 2:1 |
 | Any Craps | **Wins** at 7:1 |
-| Boxcars (12) | **Wins** at 30:1 |
-| Hi-Lo | **Wins** at 15:1 |
-| Aces | **Loses** (12 is not 2) |
+| Twelve (12) | **Wins** at 30:1 |
+| Horn | **Wins** with net payout of 27:4 |
+| Craps 2 | **Loses** (12 is not 2) |
+| Craps 3 | **Loses** (12 is not 3) |
 | Yo | **Loses** (12 is not 11) |
 | Any 7 | **Loses** |
 | Surviving Come bets | Resolve per their own state (12 is not 7, may or may not match their point) |
@@ -414,15 +421,16 @@ The following tests must exist and pass before Phase 2 is considered complete:
 | Place 6, Place 8 | 7:6 | 1.52% | Either phase, player toggles ON/OFF |
 | Place 5, Place 9 | 7:5 | 4.00% | Either phase, player toggles ON/OFF |
 | Place 4, Place 10 | 9:5 | 6.67% | Either phase, player toggles ON/OFF |
-| Field | 1:1 (2 pays 2:1, 12 pays 3:1) | 5.56% | Either phase, one-roll bet |
+| Field | 1:1 (2 and 12 pay 2:1) | 5.56% | Either phase, one-roll bet |
 | Hardway 6, Hardway 8 | 9:1 | 9.09% | Either phase, max $100 |
 | Hardway 4, Hardway 10 | 7:1 | 11.11% | Either phase, max $100 |
 | Any 7 | 4:1 | 16.67% | Either phase, one-roll, max $100 |
 | Any Craps | 7:1 | 11.11% | Either phase, one-roll (2, 3, or 12), max $100 |
+| Craps 2 | 30:1 | 13.89% | Either phase, one-roll, max $100 |
+| Craps 3 | 15:1 | 11.11% | Either phase, one-roll, max $100 |
 | Yo (11) | 15:1 | 11.11% | Either phase, one-roll, max $100 |
-| Hi-Lo (2 or 12) | 15:1 | 11.11% | Either phase, one-roll, max $100 |
-| Aces (2) | 30:1 | 13.89% | Either phase, one-roll, max $100 |
-| Boxcars (12) | 30:1 | 13.89% | Either phase, one-roll, max $100 |
+| Twelve (12) | 30:1 | 13.89% | Either phase, one-roll, max $100 |
+| Horn | Per-number odds on a 4-unit bet | — | Either phase, one-roll, min $4, max $100, multiple of 4 |
 
 **Excluded:** Big 6 / Big 8 — these are strictly inferior to Place 6/8 (same outcome, worse payout). Removing them reduces contract complexity with zero loss of meaningful gameplay.
 
@@ -439,7 +447,8 @@ Just like a real casino, proposition and one-roll bets have lower maximums than 
 | Place 6, 8 | $6 | $500 (must be multiple of 6; effective max $498) |
 | Field | $5 | $500 |
 | Hardways | $5 | $100 |
-| Proposition / One-Roll (Any 7, Any Craps, Yo, Hi-Lo, Aces, Boxcars) | $5 | $100 |
+| Proposition / One-Roll (Any 7, Any Craps, Craps 2, Craps 3, Yo, Twelve) | $5 | $100 |
+| Horn | $4 (multiple of 4) | $100 |
 
 These limits are set as immutable constructor parameters per deployment. Different limit tiers require deploying separate contract instances.
 
@@ -480,21 +489,22 @@ All bets with fractional payouts must be placed in exact multiples to ensure cle
 | Place 5 or 9 | 7:5 | `amount * 7 / 5` | 5 | $5 |
 | Place 6 or 8 | 7:6 | `amount * 7 / 6` | 6 | $6 |
 
-**All other bets (integer multiplier payouts — no multiple constraints):**
+**Other non-line bets:**
 
 | Bet | Payout | Math | Required Multiple | Minimum | Maximum |
 |---|---|---|---|---|---|
 | Field (base) | 1:1 | `amount * 1` | 1 (any) | $5 | $500 |
 | Field (on 2) | 2:1 | `amount * 2` | 1 (any) | — | — |
-| Field (on 12) | 3:1 | `amount * 3` | 1 (any) | — | — |
+| Field (on 12) | 2:1 | `amount * 2` | 1 (any) | — | — |
 | Hardway 6/8 | 9:1 | `amount * 9` | 1 (any) | $5 | $100 |
 | Hardway 4/10 | 7:1 | `amount * 7` | 1 (any) | $5 | $100 |
 | Any 7 | 4:1 | `amount * 4` | 1 (any) | $5 | $100 |
 | Any Craps | 7:1 | `amount * 7` | 1 (any) | $5 | $100 |
+| Craps 2 | 30:1 | `amount * 30` | 1 (any) | $5 | $100 |
+| Craps 3 | 15:1 | `amount * 15` | 1 (any) | $5 | $100 |
 | Yo (11) | 15:1 | `amount * 15` | 1 (any) | $5 | $100 |
-| Hi-Lo | 15:1 | `amount * 15` | 1 (any) | $5 | $100 |
-| Aces (2) | 30:1 | `amount * 30` | 1 (any) | $5 | $100 |
-| Boxcars (12) | 30:1 | `amount * 30` | 1 (any) | $5 | $100 |
+| Twelve (12) | 30:1 | `amount * 30` | 1 (any) | $5 | $100 |
+| Horn | 2/12 net `27:4`, 3/11 net `3:1` | see outcome | 4 | $4 | $100 |
 
 **Odds bet interaction with 3x cap:** Odds bets are capped at 3x the flat bet. A player with a $5 Pass Line on a point of 5 can take up to $15 in odds, but the odds amount must be a multiple of 2. So their valid choices are $6, $8, $10, $12, or $14 — not $15. The contract validates both constraints independently: `amount <= 3 * flatBet` and `amount % requiredMultiple == 0`. The effective max is the largest valid multiple at or below the 3x cap, but the contract does not compute that — it just rejects invalid amounts.
 
@@ -543,7 +553,7 @@ Certain bets can be taken down (removed) by the player, returning funds from `_i
 | Hardways | Always removable |
 | One-roll bets | Removable before rolling (no window to remove between roll and resolution) |
 
-Removal is handled by the explicit per-bet-type removal functions defined in the Bet Placement Functions section (e.g., `removeDontPass()`, `removePlace(placeIndex)`, `removeHardway(hardwayIndex)`). There is no generic `removeBet()` function.
+Removal is handled by `removeBet()` and `removeIndexedBet()` from the generic bet API. The contract validates that the targeted bet type/index is removable under the current puck state before moving funds back to `_available`.
 
 The removal function validates that the bet type is removable per the rules above, moves the bet amount from `_inPlay` back to `_available`, and zeros the slot. For Odds bets, removing the odds does not affect the parent bet. Removing a Don't Pass or Don't Come bet also removes any attached odds.
 
@@ -562,7 +572,7 @@ The player can turn on any or all of their bets when the puck is off, matching a
 | Place Bets | ✅ | Player can toggle ON for come-out (default OFF) |
 | Field | ✅ | One-roll, resolves immediately |
 | Hardways | ✅ | Persist until they hit or 7-out |
-| Any 7 / Any Craps / Yo / Hi-Lo / Aces / Boxcars | ✅ | One-roll, resolve immediately |
+| Any 7 / Any Craps / Craps 2 / Craps 3 / Yo / Twelve / Horn | ✅ | One-roll, resolve immediately |
 | Come / Don't Come | ❌ | Requires a point to be established |
 | Odds | ❌ | Requires a point to be established |
 
@@ -575,7 +585,7 @@ The player can turn on any or all of their bets when the puck is off, matching a
 | Place Bets | ✅ | Can add/remove/change at any time |
 | Field | ✅ | One-roll |
 | Hardways | ✅ | Can add if not already active |
-| Any 7 / Any Craps / Yo / Hi-Lo / Aces / Boxcars | ✅ | One-roll |
+| Any 7 / Any Craps / Craps 2 / Craps 3 / Yo / Twelve / Horn | ✅ | One-roll |
 | Pass Line | ❌ | Cannot be placed mid-round |
 | Don't Pass | ❌ | Cannot be placed mid-round |
 
@@ -646,7 +656,7 @@ constructor(
 }
 ```
 
-The contract exposes `token()` and `tokenDecimals()` view functions for frontend and block explorer transparency.
+The contract exposes `token()` so the frontend and deployment tooling can identify the bound ERC-20 for this instance.
 
 **Rationale:** This avoids the complexity of multi-token accounting while providing flexibility to operate USDC, DAI, or other stablecoin instances independently. If Circle blocklists a USDC deployment, other token instances are unaffected.
 
@@ -668,62 +678,25 @@ The contract exposes `token()` and `tokenDecimals()` view functions for frontend
 
 ### Bet Placement Functions
 
-Each bet type has its own dedicated function. This keeps validation explicit and avoids a monolithic switch statement with unused parameters.
+The contract uses a compact generic bet API keyed by `BetType`, with indexed variants for bet families that have multiple slots.
 
-**Bet placement functions:**
-
-```solidity
-// Line bets
-function placePassLine(uint256 amount) external;
-function placeDontPass(uint256 amount) external;
-function placeCome(uint256 amount) external;
-function placeDontCome(uint256 amount) external;
-
-// Odds bets (attach to parent)
-function placePassOdds(uint256 amount) external;
-function placeDontPassOdds(uint256 amount) external;
-function placeComeOdds(uint8 comeBetIndex, uint256 amount) external;
-function placeDontComeOdds(uint8 comeBetIndex, uint256 amount) external;
-
-// Place bets (index 0-5 → numbers [4, 5, 6, 8, 9, 10])
-function placePlace(uint8 placeIndex, uint256 amount) external;
-
-// One-roll and proposition bets
-function placeField(uint256 amount) external;
-function placeHardway(uint8 hardwayIndex, uint256 amount) external; // index 0-3 → [4, 6, 8, 10]
-function placeAny7(uint256 amount) external;
-function placeAnyCraps(uint256 amount) external;
-function placeYo(uint256 amount) external;
-function placeHiLo(uint256 amount) external;
-function placeAces(uint256 amount) external;
-function placeBoxcars(uint256 amount) external;
-```
-
-**Bet removal functions (removable bet types only):**
+**Bet placement/removal functions:**
 
 ```solidity
-function removeDontPass() external;
-function removeDontCome(uint8 comeBetIndex) external;
-function removePassOdds() external;
-function removeDontPassOdds() external;
-function removeComeOdds(uint8 comeBetIndex) external;
-function removeDontComeOdds(uint8 comeBetIndex) external;
-function removePlace(uint8 placeIndex) external;
-function removeHardway(uint8 hardwayIndex) external;
-function removeField() external;
-function removeAny7() external;
-function removeAnyCraps() external;
-function removeYo() external;
-function removeHiLo() external;
-function removeAces() external;
-function removeBoxcars() external;
+function placeBet(BetType betType, uint256 amount) external;
+function placeIndexedBet(BetType betType, uint8 index, uint256 amount) external;
+function removeBet(BetType betType) external;
+function removeIndexedBet(BetType betType, uint8 index) external;
+function setPlaceWorking(uint8 placeNumber, bool working) external;
 ```
 
-**Place bet toggle:**
+**Indexed bet families:**
+- `COME`, `COME_ODDS`, `DONT_COME`, `DONT_COME_ODDS` use indexes `0..3`
+- `PLACE_4`, `PLACE_5`, `PLACE_6`, `PLACE_8`, `PLACE_9`, `PLACE_10` are selected by `BetType`
+- `HARD_4`, `HARD_6`, `HARD_8`, `HARD_10` are selected by `BetType`
+- one-roll props (`FIELD`, `ANY_7`, `ANY_CRAPS`, `CRAPS_2`, `CRAPS_3`, `YO`, `TWELVE`, `HORN`) are single-slot `placeBet` calls
 
-```solidity
-function togglePlace(uint8 placeIndex, bool active) external;
-```
+**Place bet toggle:** `setPlaceWorking(placeNumber, working)` flips the ON/OFF state for place bets while leaving funds in play.
 
 **Common validation for all placement functions:**
 1. `whenNotPaused` modifier (OpenZeppelin Pausable)
@@ -817,9 +790,9 @@ The 15 outcomes to evaluate:
 
 ### Owner Functions
 
-- `withdrawFees(amount)` — draws only from `accruedFees`, requires `amount <= accruedFees`
+- `withdrawFees(to)` — transfers the full `accruedFees` balance to `to` and zeroes the accumulator
 - `withdrawBankroll(amount)` — requires `paused == true` AND `pendingVRFRequests == 0`, draws from `bankroll`
-- `depositBankroll()` — owner adds to `bankroll` at any time
+- `fundBankroll(amount)` — owner adds to `bankroll` at any time
 
 ### Stablecoin Proxy Considerations
 
@@ -868,16 +841,16 @@ A player can call `selfExclude()` to immediately block themselves from all gamep
 
 ```solidity
 mapping(address => bool) public selfExcluded;
-mapping(address => uint256) public reinstatementRequestTime;
+mapping(address => uint256) public reinstatementEligibleAt;
 
 uint256 public constant REINSTATEMENT_DELAY = 7 days;
 ```
 
 **`selfExclude()`** — sets `selfExcluded[msg.sender] = true` immediately. Any active session is expired (bets returned to `_available`). Player can still call `withdraw()`. Emits `SelfExcluded(player)`.
 
-**`requestReinstatement()`** — requires `selfExcluded[msg.sender] == true`. Sets `reinstatementRequestTime[msg.sender] = block.timestamp`. Emits `ReinstatementRequested(player, eligibleAt)`.
+**`requestSelfReinstatement()`** — requires `selfExcluded[msg.sender] == true`. Sets `reinstatementEligibleAt[msg.sender] = block.timestamp + 7 days`. Emits `SelfReinstatementRequested(player, eligibleAt)`.
 
-**`completeReinstatement()`** — requires `selfExcluded` is true, `reinstatementRequestTime` is nonzero, and `block.timestamp >= reinstatementRequestTime + REINSTATEMENT_DELAY`. Clears both flags. Emits `ReinstatementCompleted(player)`.
+**`completeSelfReinstatement()`** — requires `selfExcluded[msg.sender] == true` and `block.timestamp >= reinstatementEligibleAt[msg.sender]`. Clears exclusion and the pending timestamp. Emits `SelfReinstated(player)`.
 
 If a player calls `selfExclude()` again while a reinstatement is pending, it cancels the reinstatement and resets the timer. This prevents gaming the cooloff period.
 
@@ -889,9 +862,9 @@ The operator can exclude a player's address for legal, compliance, or other reas
 mapping(address => bool) public operatorExcluded;
 ```
 
-**`excludePlayer(address player)`** — `onlyOwner`. Same effect as self-exclusion: active session expired, bets returned, deposits and new sessions blocked. Withdrawal stays open. Emits `OperatorExcluded(player)`.
+**`operatorExclude(address player)`** — `onlyOwner`. Same effect as self-exclusion: active session expired, bets returned, deposits and new sessions blocked. Withdrawal stays open. Emits `OperatorExcluded(player)`.
 
-**`reinstatePlayer(address player)`** — `onlyOwner`. Clears the flag immediately, no delay (the operator is trusted to make this call deliberately). Emits `OperatorReinstated(player)`.
+**`operatorReinstate(address player)`** — `onlyOwner`. Clears the flag immediately, no delay (the operator is trusted to make this call deliberately). Emits `OperatorReinstated(player)`.
 
 ### Enforcement
 
@@ -909,7 +882,7 @@ modifier notExcluded() {
 
 ### Shared Session Expiry Path
 
-**Critical implementation detail:** `selfExclude()`, `excludePlayer()`, and `expireSession()` must all call the same internal `_expireSession(address player)` function. This single code path handles every cleanup scenario including ROLL_PENDING:
+**Critical implementation detail:** `selfExclude()`, `operatorExclude()`, and `expireSession()` must all call the same internal `_expireSession(address player)` function. This single code path handles every cleanup scenario including ROLL_PENDING:
 
 ```solidity
 function _expireSession(address player) internal {
@@ -918,7 +891,7 @@ function _expireSession(address player) internal {
 
     // If ROLL_PENDING, clean up VRF request and reserve
     if (session.phase == SessionPhase.ROLL_PENDING) {
-        delete requestToPlayer[session.vrfRequestId];
+        delete requestToPlayer[session.pendingRequestId];
         pendingVRFRequests--;
         bankroll += _reserved[player];
         totalReserved -= _reserved[player];
@@ -931,10 +904,11 @@ function _expireSession(address player) internal {
     _inPlay[player] = 0;
 
     // Zero all bet slots, reset session
-    // ... clear passLine, dontPass, comeBets[0..3], placeBets[0..5], hardways[0..3], oneRolls
+    // ... clear bets.passLine, bets.dontPass, bets.come[0..3], bets.dontCome[0..3],
+    //     place bets, hardways, and oneRolls
     session.phase = SessionPhase.INACTIVE;
     session.point = 0;
-    session.vrfRequestId = 0;
+    session.pendingRequestId = 0;
     activeSessions--;
 
     emit SessionExpired(player, returnedAmount);
@@ -990,8 +964,9 @@ Since each VRF callback resolves only a **single player's session**, the gas bud
 
 **Enforced limits per session:**
 - Max 4 Come bets
+- Max 4 Don't Come bets
 - Max 6 Place bets (all six numbers)
-- 7 one-roll/proposition bet slots (field, any7, anyCraps, yo, hiLo, aces, boxcars — all available simultaneously)
+- 8 one-roll/proposition bet slots (field, any7, anyCraps, craps2, craps3, yo, twelve, horn — all available simultaneously)
 
 Note: Multiple players can have `ROLL_PENDING` sessions simultaneously — each gets their own independent VRF request and callback. This is more VRF calls than a shared table, but on BASE the cost is negligible and the UX benefit (no waiting for other players) is significant.
 
@@ -1044,7 +1019,7 @@ function rollDice() external whenNotPaused notExcluded {
 
     uint256 requestId = vrfCoordinator.requestRandomWords(...);
     requestToPlayer[requestId] = msg.sender;
-    session.vrfRequestId = requestId;
+    session.pendingRequestId = requestId;
     session.phase = SessionPhase.ROLL_PENDING;
     pendingVRFRequests++;
 }
@@ -1123,7 +1098,7 @@ Comprehensive unit tests in `PayoutMath.test.ts` covering every bet type, every 
 - Table minimum: $5 (or $6 for bets requiring multiples of 6)
 - Table maximum: $500 (line/place/field), $100 (props/hardways)
 - Max odds: 3x
-- Recommended initial bankroll: $100,000 (in token units). Soft launch at $50,000 acceptable.
+- Recommended initial bankroll: $50,000 for launch (in token units). Operators may fund more for additional headroom.
 
 ### Worst-Case Payout Per Session Per Roll
 
@@ -1136,21 +1111,21 @@ The reserve-on-roll system computes the exact worst case per session dynamically
 | Don't Pass | $500 | 1:1 | $500 |
 | Field | $500 | 2:1 (on a 2) | $1,000 |
 | Any Craps | $100 | 7:1 | $700 |
-| Aces (2) | $100 | 30:1 | $3,000 |
-| Hi-Lo (2 or 12) | $100 | 15:1 | $1,500 |
-| **Total** | | | **$6,700** |
+| Craps 2 | $100 | 30:1 | $3,000 |
+| Horn | $100 | 27:4 net (2 hits) | $675 |
+| **Total** | | | **$5,875** |
 
-(Pass Line loses $500 → net house exposure $6,200, but we size bankroll against gross payouts.)
+(Pass Line loses $500 → net house exposure $5,375, but we size bankroll against gross payouts.)
 
 **Scenario B — Come-out roll of 12 (puck OFF):**
 
 | Bet | Amount | Payout Ratio | House Pays |
 |---|---|---|---|
-| Field | $500 | 3:1 (on a 12) | $1,500 |
+| Field | $500 | 2:1 (on a 12) | $1,000 |
 | Any Craps | $100 | 7:1 | $700 |
-| Boxcars (12) | $100 | 30:1 | $3,000 |
-| Hi-Lo (2 or 12) | $100 | 15:1 | $1,500 |
-| **Total** | | | **$6,700** |
+| Twelve (12) | $100 | 30:1 | $3,000 |
+| Horn | $100 | 27:4 net (12 hits) | $675 |
+| **Total** | | | **$5,375** |
 
 (Don't Pass pushes on 12, Pass loses.)
 
@@ -1177,7 +1152,7 @@ This scenario requires a specific setup: the player established Come bets on the
 
 **Theoretical worst case per session: $19,600** (Scenario C).
 
-**Why this matters:** The previous estimate of $6,700 only considered come-out scenarios and missed Come bet compounding during the point phase. The reserve-on-roll system handles this correctly regardless — `maxPossiblePayout` computes the exact number — but operator bankroll guidance must account for it.
+**Why this matters:** The smaller come-out-only scenarios still understate the real risk. Come bet compounding during the point phase is what pushes the true worst case to $19,600. The reserve-on-roll system handles this correctly regardless — `maxPossiblePayout` computes the exact number — but operator bankroll guidance must account for it.
 
 **Realistic exposure levels:** The $19,600 worst case requires a very specific sequence of rolls and max bets on every position. In practice:
 - A casual player (Pass + small odds): ~$500–$1,500 reserve
@@ -1206,7 +1181,7 @@ This is more capital-efficient than a fixed session cap because it reserves base
 
 In practice, most sessions will be casual-to-moderate, and not all sessions roll simultaneously, so effective capacity will be much higher than the max-exposure number suggests.
 
-**Recommended initial bankroll: $100,000.** This provides comfortable headroom for a mix of player profiles. A soft launch can start at $50,000 and scale up based on observed demand — the operator calls `depositBankroll()` at any time to increase capacity without redeployment.
+**Recommended launch bankroll: $50,000.** This matches the task plan and is sufficient for an initial deployment. Operators can still choose to fund more for extra concurrency headroom — call `fundBankroll()` at any time to increase capacity without redeployment.
 
 ### Bankroll Health Thresholds
 
@@ -1232,31 +1207,30 @@ A single view function that returns everything the frontend needs after any cont
 struct PlayerState {
     // Session
     SessionPhase phase;
+    PuckState puckState;
     uint8 point;
-    uint256 lastActivityTime;
+    uint48 lastActivityTime;
+    uint256 pendingRequestId;
 
     // Balances
     uint256 available;
     uint256 inPlay;
+    uint256 reserved;
 
-    // All bet slots
-    Bet passLine;
-    Bet dontPass;
-    ComeBet[4] comeBets;
-    PlaceBet[6] placeBets;
-    HardwayBet[4] hardways;
-    OneRollBets oneRolls;
+    // House context
+    uint256 bankroll;
+    uint256 totalBankroll;
+    uint256 initialBankroll;
+    uint256 accruedFees;
+    bool paused;
 
     // Exclusion status
     bool selfExcluded;
     bool operatorExcluded;
-    uint256 reinstatementEligibleAt;  // 0 if no pending reinstatement
+    uint256 reinstatementEligibleAt;
 
-    // House context
-    uint256 bankroll;           // unreserved bankroll available for new rolls
-    uint256 totalBankroll;      // reserved + unreserved (health indicator)
-    uint256 initialBankroll;
-    bool paused;
+    // All bet slots
+    BetSlots bets;
 }
 
 function getPlayerState(address player) external view returns (PlayerState memory);
@@ -1264,11 +1238,11 @@ function getPlayerState(address player) external view returns (PlayerState memor
 
 **Design notes:**
 
-- `bankroll` and `totalBankroll` are global state, not per-player, but including them saves a separate RPC call and lets the frontend show bankroll health and whether a roll is likely to succeed.
-- `reinstatementEligibleAt` is computed as `reinstatementRequestTime + REINSTATEMENT_DELAY` if a request is pending, otherwise 0. Saves the frontend from doing that math.
-- `phase == ROLL_PENDING` tells the frontend a roll is in flight — no need for `vrfRequestId` in this struct.
-- Last dice result is **not** included. The frontend gets dice values from the `DiceRolled` event, which it already listens for to trigger roll animations. Storing `lastDie1`/`lastDie2` in the session would add an unnecessary SSTORE in the callback.
-- The frontend calls this function after every transaction confirmation and after receiving a `DiceRolled` / `BetResolved` event to refresh the full UI state.
+- `bankroll`, `totalBankroll`, `initialBankroll`, and `accruedFees` are global state, not per-player, but including them saves extra RPC calls and lets the frontend show table health immediately.
+- `reserved` and `pendingRequestId` let the frontend understand whether funds are locked behind a roll already in flight.
+- `phase == ROLL_PENDING` still tells the frontend a roll is in progress; `pendingRequestId` is included for debugging and request correlation.
+- Last dice result is **not** included. The frontend gets dice values from the `RollResolved` event and can refresh state afterward.
+- The frontend calls this function after every transaction confirmation and after receiving relevant events to refresh the full UI state.
 
 ---
 
@@ -1283,21 +1257,23 @@ All events use indexed parameters for efficient log filtering. Solidity allows u
 ```solidity
 event Deposit(address indexed player, uint256 amount, uint256 fee);
 event Withdrawal(address indexed player, uint256 amount);
-event BetPlaced(address indexed player, BetType indexed betType, uint256 amount);
-event DiceRolled(address indexed player, uint256 indexed requestId, uint8 die1, uint8 die2);
-event BetResolved(address indexed player, BetType indexed betType, bool won, uint256 payout);
-event SessionStarted(address indexed player);
+event SessionOpened(address indexed player);
+event SessionClosed(address indexed player, uint256 returnedAmount);
 event SessionExpired(address indexed player, uint256 returnedAmount);
+event BetPlaced(address indexed player, BetType indexed betType, uint256 amount);
+event BetRemoved(address indexed player, BetType indexed betType, uint256 amount);
+event RollRequested(address indexed player, uint256 indexed requestId, uint256 reservedAmount);
+event RollResolved(address indexed player, uint256 indexed requestId, uint8 die1, uint8 die2, uint256 payout);
 event SelfExcluded(address indexed player);
-event ReinstatementRequested(address indexed player, uint256 eligibleAt);
-event ReinstatementCompleted(address indexed player);
+event SelfReinstatementRequested(address indexed player, uint256 eligibleAt);
+event SelfReinstated(address indexed player);
 event OperatorExcluded(address indexed player);
 event OperatorReinstated(address indexed player);
 ```
 
-`BetPlaced` and `BetResolved` index `betType` so the frontend can filter for specific bet activity (e.g., all Place 6 results). `DiceRolled` indexes `requestId` to correlate VRF requests to results.
+`BetPlaced` and `BetRemoved` index `betType` so the frontend can filter for specific bet activity (e.g., all Place 6 changes). `RollRequested` and `RollResolved` index `requestId` to correlate VRF requests to results.
 
-`BetResolved` fires once per active bet during the callback. The frontend reconstructs a full roll outcome by collecting all `BetResolved` events with the same block number and player address.
+`RollResolved` is the authoritative roll-result event in the current interface. The frontend combines it with a fresh `getPlayerState()` read to update chips, balances, and layout state.
 
 ### Operator/System Events
 
@@ -1335,7 +1311,7 @@ event BankrollAutoPaused(uint256 currentBankroll);
 7. Come / Don't Come with sub-state machines (per-session, max 4 slots)
 8. Odds bets (3x max) for Pass, Don't Pass, Come, Don't Come
 9. Place bets (4, 5, 6, 8, 9, 10) with tiered limits
-10. One-roll bets (Field, Any 7, Any Craps, Yo, Hi-Lo, Aces, Boxcars) with $100 prop cap
+10. One-roll bets (Field, Any 7, Any Craps, Craps 2, Craps 3, Yo, Twelve, Horn) with $100 prop cap
 11. Hardways with $100 cap, full resolution logic (win on pair, lose on easy way or 7)
 12. Session timeout / expiry mechanic (24h), including expiry during ROLL_PENDING, shared `_expireSession()` path
 13. Self-exclusion + operator exclusion (both using `_expireSession()`)
@@ -1365,12 +1341,12 @@ event BankrollAutoPaused(uint256 currentBankroll);
 
 ### Phase 5 — BASE Mainnet Deployment (Week 9)
 
-1. Deploy to BASE mainnet via Hardhat Ignition with `initialBankroll = 100,000 USDC` (or $50,000 for soft launch)
+1. Deploy to BASE mainnet via Hardhat Ignition with `initialBankroll = 50,000 USDC` for launch (operators may choose a larger bankroll if desired)
 2. Constructor params: `token = USDC`, `tokenDecimals = 6`, `minBet = 5`, `maxBetLine = 500`, `maxBetProp = 100`, `maxOdds = 3`, `sessionTimeout = 86400`
 3. Fund VRF subscription with real LINK on BASE
 4. Verify on Basescan
 5. Monitor bankroll, gas usage, VRF response times for first 48 hours
-6. To scale capacity, operator calls `depositBankroll()` — more bankroll = more reserve headroom for concurrent rolls
+6. To scale capacity, operator calls `fundBankroll()` — more bankroll = more reserve headroom for concurrent rolls
 
 ---
 
@@ -1412,17 +1388,17 @@ Desktop and landscape tablets render the full UI without prompting.
 
 | Event | Frontend Reaction |
 |---|---|
-| `DiceRolled` | Trigger dice animation with die1/die2 values, then call `getPlayerState` to refresh |
-| `BetResolved` | Collect all BetResolved events in the same block, display win/loss summary per bet |
+| `RollRequested` | Enter pending/rolling state and correlate UI with `requestId` |
+| `RollResolved` | Trigger dice animation with `die1`/`die2`, show roll summary, then call `getPlayerState` to refresh |
 | `SessionExpired` | Show expiry notification, refresh state |
 | `BankrollWarning` / `BankrollCritical` | Update bankroll health indicator |
 | `BankrollAutoPaused` | Show "Table temporarily closed" messaging |
 
 **State refresh strategy:** Call `getPlayerState` after: wallet connection, any write transaction confirmation, any relevant event received, and on a slow poll interval (~30s) as a fallback for missed events.
 
-**In-memory roll history:** Each `DiceRolled` event during the current session is appended to an in-memory array. Includes die1, die2, sum, and the associated `BetResolved` outcomes. Cleared when the session goes INACTIVE.
+**In-memory roll history:** Each `RollResolved` event during the current session is appended to an in-memory array. Includes die1, die2, sum, `requestId`, and total payout. Cleared when the session goes INACTIVE.
 
-**Persistent roll history:** A separate history page queries `DiceRolled` and `BetResolved` event logs for the connected address. Paginated, loaded on demand. Survives page refresh and session boundaries.
+**Persistent roll history:** A separate history page queries `RollResolved` logs for the connected address. Paginated, loaded on demand. Survives page refresh and session boundaries.
 
 ### Wallet Connection Flow
 
@@ -1469,8 +1445,8 @@ The betting surface is a hybrid felt-inspired layout. Bet positions are arranged
 ├──────┬──────┬──────┬──────┬─────────────┤───────────────────┤
 │  H4  │  H6  │  H8  │  H10 │             │  [ONE-ROLL BETS]  │
 │      │      │      │      │             │  Any 7 | Craps    │
-│      │      │      │      │             │  Yo | Hi-Lo       │
-│      │      │      │      │             │  Aces | Boxcars   │
+│      │      │      │      │             │  C2/C3 | Yo       │
+│      │      │      │      │             │  12 | Horn        │
 └──────┴──────┴──────┴──────┴─────────────┴───────────────────┘
 ```
 
@@ -1555,14 +1531,13 @@ Place bets have an ON/OFF toggle visible on each Place position:
    - Roll button disabled, replaced with animated "Rolling..." indicator
    - All bet positions become non-interactive
    - Dice animation begins (anticipation phase)
-8. **On `DiceRolled` event received:**
-   - Dice animation resolves to show die1 and die2 values
+8. **On `RollResolved` event received:**
+   - Dice animation resolves to show `die1` and `die2`
    - Brief pause (~1-2 seconds) for the player to see the roll
-9. **On `BetResolved` events received (same block):**
-   - Each bet position flashes green (win) or red (loss) with the payout/loss amount
-   - Wins show "+$X" animation floating up from the bet position
-   - Losses show the chip being swept
-   - Pushes (Don't Pass/Don't Come on 12) show "Push" label — no animation, bet stays
+   - Show a roll summary using the event payload and refreshed `getPlayerState()` data
+9. **After state refresh:**
+   - Update chip positions, balances, and surviving bets from the new `PlayerState`
+   - Optional UI diffing can highlight which bets disappeared, persisted, or paid out
 10. **State refresh via `getPlayerState`:**
     - Balances update
     - Puck state updates (point established/cleared)
@@ -1635,9 +1610,9 @@ Never show raw Solidity revert strings or hex error codes to the player.
 **Full history page (persistent, from event logs):**
 
 - Separate page/route accessible from navigation
-- Queries `DiceRolled` and `BetResolved` events for the connected address
+- Queries `RollResolved` events for the connected address
 - Paginated, loaded on demand (most recent first)
-- Each entry shows: timestamp, die values, all bet outcomes, net result for that roll
+- Each entry shows: timestamp, die values, requestId, and total payout for that roll
 - Session boundaries marked (session start/end indicators)
 - Running totals: total wagered, total won, total lost, net result
 - Date range filters
@@ -1703,8 +1678,8 @@ When a new contract version is deployed and the old contract is paused:
 **Phase F3 — Roll Experience:**
 1. Roll button with ROLL_PENDING state management
 2. Dice animation (anticipation → result)
-3. Event subscription (DiceRolled, BetResolved)
-4. Bet resolution animations (win/loss/push per position)
+3. Event subscription (`RollRequested`, `RollResolved`)
+4. Post-roll state refresh and layout diffing
 5. Roll result summary banner
 6. In-memory roll history panel
 7. State refresh orchestration (event-driven + polling fallback)
@@ -1775,8 +1750,8 @@ When a new contract version is deployed and the old contract is paused:
 - [ ] Bet stacking: Pass/Don't Pass reject on occupied slot; odds/place/hardway/one-roll are additive up to caps
 - [ ] Additive bets validate NEW TOTAL (existing + added) against max and multiples
 - [ ] All bet placement and removal blocked during `ROLL_PENDING`
-- [ ] `selfExclude()`, `excludePlayer()`, and `expireSession()` all use shared `_expireSession()` internal function
-- [ ] All 7 one-roll bet slots available simultaneously (no artificial cap)
+- [ ] `selfExclude()`, `operatorExclude()`, and `expireSession()` all use shared `_expireSession()` internal function
+- [ ] All 8 one-roll bet slots available simultaneously (no artificial cap)
 
 ---
 
@@ -1821,7 +1796,7 @@ When a new contract version is deployed and the old contract is paused:
 
 14. **Responsible gambling.** Voluntary self-exclusion with 7-day reinstatement delay. Operator-imposed exclusion with immediate operator reinstatement. Both block deposits, bet placement, and rolls but never block withdrawals. Active sessions are expired immediately upon exclusion.
 
-15. **All 7 one-roll bet slots available simultaneously.** No artificial cap on concurrent one-roll bets. The `OneRollBets` struct has 7 fixed fields (field, any7, anyCraps, yo, hiLo, aces, boxcars), all usable at once. Gas budget updated to ~480k, within the 500k callbackGasLimit.
+15. **All 8 one-roll bet slots available simultaneously.** No artificial cap on concurrent one-roll bets. The `OneRollBets` struct has 8 fixed fields (field, any7, anyCraps, craps2, craps3, yo, twelve, horn), all usable at once. Gas budget should be validated against that full set.
 
 16. **`totalReserved` running counter.** A `uint256 public totalReserved` tracks the sum of all per-player `_reserved` values. Incremented in `rollDice()`, decremented in callback resolution and session expiry. Used by bankroll health thresholds (`bankroll + totalReserved` vs `initialBankroll`). Avoids iterating all player addresses on-chain.
 
@@ -1829,7 +1804,7 @@ When a new contract version is deployed and the old contract is paused:
 
 18. **Bet stacking and removal.** Pass Line and Come bets reject if slot is occupied and are locked (non-removable) from placement. Come/Don't Come use the next empty slot. Odds, Place, Hardway, and one-roll bets are additive up to their respective caps. Don't Pass, Don't Come, all Odds, Place, Hardway, and one-roll bets are removable. No bet modifications during `ROLL_PENDING`.
 
-19. **Shared `_expireSession()` internal function.** `selfExclude()`, `excludePlayer()`, and `expireSession()` all call the same internal cleanup function. This guarantees consistent handling of ROLL_PENDING state (reserve return, `totalReserved` decrement, `pendingVRFRequests` decrement, `requestToPlayer` cleanup) across all expiry paths.
+19. **Shared `_expireSession()` internal function.** `selfExclude()`, `operatorExclude()`, and `expireSession()` all call the same internal cleanup function. This guarantees consistent handling of ROLL_PENDING state (reserve return, `totalReserved` decrement, `pendingVRFRequests` decrement, `requestToPlayer` cleanup) across all expiry paths.
 
 20. **Callback iterates all bet slots on every roll.** No phase-based shortcutting of which bets to evaluate. Come bets can survive into the come-out phase after a point is hit, so every slot must be checked on every roll. The phase only determines post-resolution state transitions.
 
@@ -1837,8 +1812,8 @@ When a new contract version is deployed and the old contract is paused:
 
 22. **Four session phases.** `INACTIVE`, `COME_OUT`, `POINT`, `ROLL_PENDING`. The previously planned `BETTING` phase was removed as redundant — the first bet transitions directly from `INACTIVE` to `COME_OUT`.
 
-23. **Explicit per-bet-type functions.** 18 placement functions, 15 removal functions, 1 toggle function. No generic `placeBet()` or `removeBet()`. Each function has its own validation, making the contract surface explicit and auditable.
+23. **Generic bet API.** The interface uses `placeBet()` / `removeBet()` plus indexed variants and `setPlaceWorking()`. Validation still depends on `BetType`, but the external surface stays compact and matches the task plan used for implementation.
 
-24. **$100,000 recommended initial bankroll.** Revised from $50,000 after discovering that Come bet compounding with odds creates a theoretical worst case of ~$19,600 per session (not $6,700 as originally estimated). Soft launch at $50,000 is acceptable. Operator scales up via `depositBankroll()`.
+24. **$50,000 recommended launch bankroll.** This matches the implementation task plan. Operators can fund additional bankroll later via `fundBankroll()` if they want more reserve headroom for concurrent rolls.
 
 25. **Standard ERC-20 only.** Fee-on-transfer tokens, rebasing tokens, and tokens with transfer hooks are incompatible. Deploying with such tokens will break the five-bucket invariant. This is an operator deployment responsibility, not enforced on-chain.
