@@ -70,7 +70,7 @@ VRF or vault logic. These files are the foundation — get them right before bui
 | 1.1c | — Unit tests: `test/unit/PayoutMath.test.ts` — verify every payout multiple from table, verify worst-case derivation for a come-out 2, come-out 12, hard 4 on point of 4 (see PLAN.md §Worst-Case Derivations) | Test agent | [x] |
 | 1.2 | Implement `contracts/interfaces/ICrapsGame.sol` — all external function signatures, events, errors, enums (`BetType`, `PuckState`, `SessionPhase`), and structs (`Bet`, `PlaceBet`, `HardwayBet`, `OneRollBets`, `BetSlots`, `PlayerState`) | Interface agent | [x] |
 | 1.3 | Implement `contracts/mocks/MockERC20.sol` — minimal ERC-20 with 6-decimal default, `mint(address, uint)` permissionless (test use only), EIP-2612 permit support | Mock agent | [x] |
-| 1.4 | Implement `contracts/mocks/MockVRFCoordinator.sol` — implements `VRFCoordinatorV2_5Interface`, stores pending requests, exposes `fulfillRandomWords(requestId, words[])` callable by test runner to simulate VRF callback | Mock agent | [x] |
+| 1.4 | Implement `contracts/mocks/MockVRFCoordinator.sol` — implements the Chainlink VRF v2.5 coordinator interface (`IVRFCoordinatorV2Plus` in the installed package), stores pending requests, exposes `fulfillRandomWords(requestId, words[])` callable by test runner to simulate VRF callback | Mock agent | [x] |
 | 1.5 | Unit tests for `MockERC20` and `MockVRFCoordinator`: `test/unit/Mocks.test.ts` | Test agent | [x] |
 
 **Payout table (implement exactly as specified):**
@@ -114,29 +114,29 @@ full tests (2.3) require the contract to be complete.
 
 | ID | Task | Subagent hint | Status |
 |----|------|---------------|--------|
-| 2.1 | Implement `contracts/CrapsGame.sol` vault section — all five accounting buckets as contract-level mappings and a single `bankroll` + `accruedFees` scalar | Vault agent | [ ] |
-| 2.1a | — `deposit(uint256 amount)` — transfer token in, deduct `DEPOSIT_FEE_BPS = 50` (0.5%), credit `_available[player]`, accumulate `accruedFees` | Vault agent | [ ] |
-| 2.1b | — `withdraw(uint256 amount)` — require `amount <= _available[msg.sender]`, transfer out | Vault agent | [ ] |
-| 2.1c | — `_debitAvailable(address player, uint256 amount)` — internal, moves `_available → _inPlay` | Vault agent | [ ] |
-| 2.1d | — `_creditAvailable(address player, uint256 amount)` — internal, moves source → `_available` (used for wins and bet returns) | Vault agent | [ ] |
-| 2.1e | — `_reserveFromBankroll(address player, uint256 amount)` — internal, moves `bankroll → _reserved[player]` | Vault agent | [ ] |
-| 2.1f | — `_releaseReserve(address player, uint256 paidOut)` — internal, called after VRF callback; moves `paidOut` from `_reserved[player]` to `_available[player]`, remainder back to `bankroll` | Vault agent | [ ] |
-| 2.1g | — `withdrawFees(address to)` — `onlyOwner`, transfers `accruedFees` to `to`, zeroes accumulator | Vault agent | [ ] |
-| 2.1h | — `fundBankroll(uint256 amount)` — `onlyOwner`, transfers token in, adds to `bankroll` | Vault agent | [ ] |
-| 2.1i | — `withdrawBankroll(uint256 amount)` — `onlyOwner`, requires `paused()`, transfers from `bankroll` | Vault agent | [ ] |
-| 2.1j | — `_assertInvariant()` — internal view, `assert(token.balanceOf(address(this)) == sumAvailable + sumInPlay + sumReserved + bankroll + accruedFees)`; call in every state-mutating function during testing via `DEBUG` flag | Vault agent | [ ] |
-| 2.2 | Set up `test/unit/Vault.test.ts` with `MockERC20`, `MockVRFCoordinator` harness | Test agent | [ ] |
-| 2.3 | Unit tests — `test/unit/Vault.test.ts` | Test agent | [ ] |
-| 2.3a | — Deposit: correct `_available` credit, correct fee to `accruedFees`, invariant holds | Test agent | [ ] |
-| 2.3b | — Deposit: zero-amount reverts, paused reverts | Test agent | [ ] |
-| 2.3c | — Withdraw: full and partial withdrawal, invariant holds | Test agent | [ ] |
-| 2.3d | — Withdraw: exceeds `_available` reverts, paused does NOT block withdrawal | Test agent | [ ] |
-| 2.3e | — `_debitAvailable` / `_creditAvailable`: correct bucket transfers, invariant holds | Test agent | [ ] |
-| 2.3f | — Reserve/release cycle: reserve moves bankroll → `_reserved`; release splits back correctly on various payout amounts | Test agent | [ ] |
-| 2.3g | — `withdrawFees`: only owner, correct amount, zeroes accumulator | Test agent | [ ] |
-| 2.3h | — `fundBankroll`: correct bucket increase, invariant holds | Test agent | [ ] |
-| 2.3i | — `withdrawBankroll`: requires paused, correct bucket decrease | Test agent | [ ] |
-| 2.3j | — Fuzz test: 50 random deposit/withdraw sequences, invariant assertion fires on every step | Test agent | [ ] |
+| 2.1 | Implement `contracts/CrapsGame.sol` vault section — all five accounting buckets as contract-level mappings and a single `bankroll` + `accruedFees` scalar | Vault agent | [x] |
+| 2.1a | — `deposit(uint256 amount)` — transfer token in, deduct `DEPOSIT_FEE_BPS = 50` (0.5%), credit `_available[player]`, accumulate `accruedFees` | Vault agent | [x] |
+| 2.1b | — `withdraw(uint256 amount)` — require `amount <= _available[msg.sender]`, transfer out | Vault agent | [x] |
+| 2.1c | — `_debitAvailable(address player, uint256 amount)` — internal, moves `_available → _inPlay` | Vault agent | [x] |
+| 2.1d | — `_creditAvailable(address player, uint256 amount)` — internal, moves source → `_available` (used for wins and bet returns) | Vault agent | [x] |
+| 2.1e | — `_reserveFromBankroll(address player, uint256 amount)` — internal, moves `bankroll → _reserved[player]` | Vault agent | [x] |
+| 2.1f | — `_releaseReserve(address player, uint256 paidOut)` — internal, called after VRF callback; moves `paidOut` from `_reserved[player]` to `_available[player]`, remainder back to `bankroll` | Vault agent | [x] |
+| 2.1g | — `withdrawFees(address to)` — `onlyOwner`, transfers `accruedFees` to `to`, zeroes accumulator | Vault agent | [x] |
+| 2.1h | — `fundBankroll(uint256 amount)` — `onlyOwner`, transfers token in, adds to `bankroll` | Vault agent | [x] |
+| 2.1i | — `withdrawBankroll(uint256 amount)` — `onlyOwner`, requires `paused()`, transfers from `bankroll` | Vault agent | [x] |
+| 2.1j | — `_assertInvariant()` — internal view, `assert(token.balanceOf(address(this)) == sumAvailable + sumInPlay + sumReserved + bankroll + accruedFees)`; call in every state-mutating function during testing via `DEBUG` flag | Vault agent | [x] |
+| 2.2 | Set up `test/unit/Vault.test.ts` with `MockERC20`, `MockVRFCoordinator` harness | Test agent | [x] |
+| 2.3 | Unit tests — `test/unit/Vault.test.ts` | Test agent | [x] |
+| 2.3a | — Deposit: correct `_available` credit, correct fee to `accruedFees`, invariant holds | Test agent | [x] |
+| 2.3b | — Deposit: zero-amount reverts, paused reverts | Test agent | [x] |
+| 2.3c | — Withdraw: full and partial withdrawal, invariant holds | Test agent | [x] |
+| 2.3d | — Withdraw: exceeds `_available` reverts, paused does NOT block withdrawal | Test agent | [x] |
+| 2.3e | — `_debitAvailable` / `_creditAvailable`: correct bucket transfers, invariant holds | Test agent | [x] |
+| 2.3f | — Reserve/release cycle: reserve moves bankroll → `_reserved`; release splits back correctly on various payout amounts | Test agent | [x] |
+| 2.3g | — `withdrawFees`: only owner, correct amount, zeroes accumulator | Test agent | [x] |
+| 2.3h | — `fundBankroll`: correct bucket increase, invariant holds | Test agent | [x] |
+| 2.3i | — `withdrawBankroll`: requires paused, correct bucket decrease | Test agent | [x] |
+| 2.3j | — Fuzz test: 50 random deposit/withdraw sequences, invariant assertion fires on every step | Test agent | [x] |
 
 **Constant values (use exactly):**
 ```solidity
