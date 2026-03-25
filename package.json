@@ -35,7 +35,8 @@
     "fork:sepolia:anvil": "set -a; source ./.env; set +a; ~/.foundry/bin/anvil --fork-url \"$BASE_SEPOLIA_RPC_URL\" --port 8555",
     "fork:sepolia:expire": "hardhat run scripts/anvil-expire-sepolia-session.ts --network hardhat --no-compile",
     "full:sepolia:rehearsal": "pnpm preflight:sepolia:rehearsal && pnpm deploy:sepolia:rehearsal-token && pnpm verify:sepolia:rehearsal-token:sourcify && pnpm mint:sepolia:rehearsal-funds && pnpm deploy:sepolia && pnpm add:sepolia:consumer && pnpm verify:sepolia:sourcify",
-    "full:sepolia:rehearsal:smoke": "pnpm full:sepolia:rehearsal && pnpm smoke:sepolia"
+    "full:sepolia:rehearsal:smoke": "pnpm full:sepolia:rehearsal && pnpm smoke:sepolia",
+    "export:abi": "node -e \"const fs=require('fs');const a=JSON.parse(fs.readFileSync('artifacts/contracts/CrapsGame.sol/CrapsGame.json','utf8'));fs.mkdirSync('frontend/src/abi',{recursive:true});fs.writeFileSync('frontend/src/abi/CrapsGame.json',JSON.stringify(a.abi,null,2));console.log('ABI exported to frontend/src/abi/CrapsGame.json')\""
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ignition": "^0.15",
