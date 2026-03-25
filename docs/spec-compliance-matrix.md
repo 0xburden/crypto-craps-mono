@@ -66,7 +66,7 @@ Because of these conflicts, some rows below are marked `TASKS/PLAN conflict` rat
 | 0.1 | Hardhat TS project initialized | Compliant | `package.json`, `hardhat.config.ts`, `tsconfig.json` present | Current repo clearly has mature Hardhat TS setup |
 | 0.2 | Required dependencies installed | Compliant | `package.json:16-28` | Includes required deps plus reasonable extras (`ts-node`, `typescript`, `dotenv`) |
 | 0.3 | Required directory structure exists | Compliant | `contracts/`, `contracts/interfaces/`, `contracts/libraries/`, `contracts/mocks/`, `test/unit/`, `test/integration/`, `ignition/modules/`, `frontend/` | Verified present |
-| 0.4 | Hardhat config: Solidity, BASE networks, Basescan, gas reporter, coverage | Compliant | `hardhat.config.ts:11-71` | Includes `0.8.24`, `baseSepolia`, `base`, `etherscan`, `gasReporter`, `solidity-coverage` |
+| 0.4 | Hardhat config: Solidity, BASE networks, public verification support, gas reporter, coverage | Compliant | `hardhat.config.ts:11-71` | Includes `0.8.24`, `baseSepolia`, `base`, explorer verification config, Sourcify support, `gasReporter`, `solidity-coverage` |
 | 0.5 | `.env.example` variables present | Compliant | `.env.example:1-6` | All required vars present |
 | 0.6 | Slither/Mythril config stubs present | Compliant | `slither.config.json`, `mythril.config.json` | Present |
 | 0.7 | CI stub on push | Compliant | `.github/workflows/ci.yml:8-21` | CI runs install, compile, test |

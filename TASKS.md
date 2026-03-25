@@ -302,7 +302,7 @@ internal functions — only `MockERC20` and `MockVRFCoordinator` are permitted.
 | 6.3a | — VRF Coordinator v2.5: `0x5C210eF41CD1a72de73bF76eC39637bB0d3d7BEE` | Deploy agent | [x] |
 | 6.3b | — LINK token (Sepolia): `0xE4aB69C077896252FAFBD49EFD26B5D171A32410` | Deploy agent | [x] |
 | 6.3c | — USDC (BASE Sepolia, Circle): `0x036CbD53842c5426634e7929541eC2318f3dCF7e` | Deploy agent | [x] |
-| 6.3d | — Key hash (BASE Sepolia, 30 gwei lane): `0x9e9e46732b32662b9adc6f3abdf6c5e926a666d6b7a39d3a50b33ff4f6f56f9` | Deploy agent | [x] |
+| 6.3d | — Key hash (BASE Sepolia, 30 gwei lane): `0x9e1344a1247c8a1785d0a4681a27152bffdb43666ae5bf7d14d24a5efd44bf71` | Deploy agent | [x] |
 | 6.4 | Create VRF subscription setup guide in `docs/vrf-setup.md` — how to create subscription on vrf.chain.link, add consumer contract address, fund with LINK | Docs agent | [x] |
 | 6.5 | Add `npm run deploy:sepolia` and `npm run deploy:mainnet` scripts to `package.json` | Deploy agent | [x] |
 
@@ -347,30 +347,37 @@ deploys until Slither and Mythril pass with no high/critical findings.
 
 ## Phase 8 — BASE Sepolia Testnet Deployment
 
-**Goal:** Live deployment on BASE Sepolia, verified on Basescan, smoke-tested end-to-end.
+**Goal:** Live deployment on BASE Sepolia using the project's custom mintable 6-decimal rehearsal token, verified on Sourcify, smoke-tested end-to-end.
+**Current status:** [x] Complete for the adopted Sepolia rehearsal approach — deployment succeeded on BASE Sepolia using the mintable rehearsal token, Sourcify verification succeeded, the smoke flow passed, and `8.5i` was completed with an Anvil fork against the live deployment.
 
 | ID | Task | Subagent hint | Status |
 |----|------|---------------|--------|
-| 8.1 | Create VRF subscription on BASE Sepolia via vrf.chain.link, fund with testnet LINK, record `VRF_SUBSCRIPTION_ID` in `.env` | Deploy agent | [ ] |
-| 8.2 | Run `npm run deploy:sepolia` — confirm deployment succeeds, record contract address in `deployments/sepolia-deployment.json` | Deploy agent | [ ] |
-| 8.3 | Add deployed contract as VRF consumer to subscription (via vrf.chain.link UI) | Deploy agent | [ ] |
-| 8.4 | Run `npm run verify:sepolia` — confirm contract is verified on Basescan | Deploy agent | [ ] |
-| 8.5 | Smoke test checklist (manual or scripted): | Test agent | [ ] |
-| 8.5a | — Acquire testnet USDC via Circle faucet, confirm wallet balance | Test agent | [ ] |
-| 8.5b | — `deposit(100e6)` → confirm `_available` balance and fee accrual in `getPlayerState` | Test agent | [ ] |
-| 8.5c | — `openSession()` → confirm session phase is `COME_OUT` | Test agent | [ ] |
-| 8.5d | — `placeBet(PASS_LINE, 10e6)` → confirm `_inPlay` updated | Test agent | [ ] |
-| 8.5e | — `rollDice()` → confirm `phase = ROLL_PENDING`, VRF request emitted | Test agent | [ ] |
-| 8.5f | — Wait for Chainlink VRF fulfillment (typically 1–3 minutes on Sepolia) | Test agent | [ ] |
-| 8.5g | — Confirm `phase` has advanced, balances updated correctly | Test agent | [ ] |
-| 8.5h | — `withdraw(amount)` → confirm token received in wallet | Test agent | [ ] |
-| 8.5i | — Trigger session expiry: advance block.timestamp (via time manipulation in a fork test or wait 24h on live testnet) | Test agent | [ ] |
-| 8.6 | Document any testnet findings in `deployments/sepolia-findings.md` | Deploy agent | [ ] |
+| 8.1 | Create VRF subscription on BASE Sepolia via vrf.chain.link, fund with testnet LINK, record `VRF_SUBSCRIPTION_ID` in `.env` | Deploy agent | [x] |
+| 8.2 | Run `pnpm deploy:sepolia` — confirm deployment succeeds, record contract address in `deployments/sepolia-deployment.json` | Deploy agent | [x] |
+| 8.3 | Add deployed contract as VRF consumer to subscription (via vrf.chain.link UI or owner transaction) | Deploy agent | [x] |
+| 8.4 | Run `pnpm verify:sepolia:sourcify` — confirm contract is verified on Sourcify | Deploy agent | [x] |
+| 8.5 | Smoke test checklist (manual or scripted): | Test agent | [x] |
+| 8.5a | — Mint rehearsal token funds to the deployer/player wallet, confirm wallet or on-contract player balance is sufficient for the smoke flow | Test agent | [x] |
+| 8.5b | — `deposit(100e6)` → confirm `_available` balance and fee accrual in `getPlayerState` | Test agent | [x] |
+| 8.5c | — `openSession()` → confirm session phase is `COME_OUT` | Test agent | [x] |
+| 8.5d | — `placeBet(PASS_LINE, 10e6)` → confirm `_inPlay` updated | Test agent | [x] |
+| 8.5e | — `rollDice()` → confirm `phase = ROLL_PENDING`, VRF request emitted | Test agent | [x] |
+| 8.5f | — Wait for Chainlink VRF fulfillment (typically 1–3 minutes on Sepolia) | Test agent | [x] |
+| 8.5g | — Confirm `phase` has advanced, balances updated correctly | Test agent | [x] |
+| 8.5h | — `withdraw(amount)` → confirm token received in wallet | Test agent | [x] |
+| 8.5i | — Trigger session expiry: advance block.timestamp (via **Anvil** fork against the deployed Sepolia contract or wait 24h on live testnet) | Test agent | [x] |
+| 8.6 | Document any testnet findings in `deployments/sepolia-findings.md` | Deploy agent | [x] |
+
+**Phase 8 implementation notes:**
+- The Sepolia deployment uses the project's custom rehearsal token (`srUSDC`) rather than Circle BASE Sepolia USDC.
+- Public source verification for the Sepolia rehearsal path is performed via **Sourcify** rather than Basescan.
+- The 24-hour expiry path is validated with an **Anvil** fork against the live Sepolia deployment.
+- See `docs/sepolia-rehearsal-deployment.md` and `docs/anvil-sepolia-expiry.md` for the recorded run and fork-based expiry procedure.
 
 **Phase 8 exit criteria:**
-- Contract live and verified on Basescan
+- Contract live on BASE Sepolia and verified on Sourcify
 - All 9 smoke test steps pass
-- VRF fulfillment confirmed on-chain (transaction visible in Basescan)
+- VRF fulfillment confirmed on-chain
 
 ---
 
@@ -422,7 +429,7 @@ the full player flow: connect wallet → deposit → play → withdraw.
 {
   "vrfCoordinator": "0xd5D517aBE5cF79B7e95eC98dB0f0277788aFF634",
   "usdcAddress":    "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-  "keyHash30Gwei":  "0x00456d8a57dbabf4e48f22dfb60c6c4e5f82b81c3d1ecc28b98f4c67e0a2f9b9",
+  "keyHash30Gwei":  "0xdc2f87677b01473c763cb0aee938ed3341512f6057324a584e5944e786144d70",
   "chainId":        8453
 }
 ```

@@ -25,11 +25,12 @@ On-chain craps for BASE, implemented as a Hardhat monorepo-in-name but currently
   - `CrapsGameHarness.sol`: Exposes internal helpers for unit tests.
   - `MockERC20.sol`: 6-decimal ERC-20 with permit + unrestricted mint for tests.
   - `MockVRFCoordinator.sol`: Local VRF coordinator simulator.
-- `test/unit/`: Main test suite. This repo currently has extensive **unit tests** and no real integration tests yet.
+- `test/unit/`: Main unit test suite.
 - `test/unit/helpers/gameFixture.ts`: Shared deployment fixture, bet enum constants, USD helper, and roll helper.
-- `test/integration/`: Placeholder only (`.gitkeep`).
+- `test/integration/`: Integration tests covering session flows, exclusions/solvency, multiplayer/pause behavior, and invariant-style randomized sequences.
 - `scripts/check-vault-coverage.mjs`: Coverage gate for selected vault functions in `CrapsGame.sol`.
-- `ignition/modules/`: Placeholder for future deployment modules.
+- `scripts/`: Deployment, verification, rehearsal-token, smoke-test, and Sepolia fork/expiry helpers.
+- `ignition/modules/`: Ignition deployment modules, including `ignition/modules/CrapsGame.ts`.
 - `frontend/`: Placeholder only; frontend has not been scaffolded yet.
 - `typechain-types/`: Generated contract typings.
 - `artifacts/`, `cache/`, `coverage/`: Generated Hardhat outputs.
@@ -39,21 +40,19 @@ On-chain craps for BASE, implemented as a Hardhat monorepo-in-name but currently
 - `.github/workflows/ci.yml`: CI runs install, compile, and test.
 
 ## CURRENT STATUS
-Per `TASKS.md`, Phases **0-4** are marked complete:
-- scaffold/config
-- libraries/interfaces/mocks
-- vault accounting
-- core game/session/VRF flow
-- full bet suite
+Per `TASKS.md`, the contract, unit/integration tests, security/audit scripts, and the adopted BASE Sepolia deployment flow are implemented.
 
-Phases **5+** are still pending:
-- integration tests
-- deployment infrastructure
-- security/static analysis
-- testnet/mainnet deployment
-- frontend
+Highlights:
+- Phases 0-7 are materially implemented in-repo
+- Phase 8 is documented as complete for the adopted Sepolia path:
+  - custom mintable rehearsal token (`srUSDC`)
+  - Sourcify verification
+  - live VRF-backed smoke test
+  - Anvil-based session-expiry validation
+- Mainnet deployment planning remains tracked separately in later phases
+- Frontend work is still largely pending
 
-Important implication: the smart contract and unit tests are substantial, but deployment/docs/frontend paths are still incomplete.
+Important implication: the repo is no longer just contract/unit-test scaffolding; it now includes live deployment automation, verification helpers, runbooks, and Sepolia findings artifacts.
 
 ## COMMANDS
 | Action | Command |
@@ -66,17 +65,35 @@ Important implication: the smart contract and unit tests are substantial, but de
 | Coverage | `pnpm coverage` |
 | Vault coverage gate | `pnpm coverage:vault` |
 | Start local chain | `pnpm node` |
+| Prepare Sepolia deploy params | `pnpm prepare:deploy:sepolia` |
+| Deploy rehearsal token | `pnpm deploy:sepolia:rehearsal-token` |
+| Mint rehearsal funds | `pnpm mint:sepolia:rehearsal-funds` |
+| Deploy to BASE Sepolia | `pnpm deploy:sepolia` |
+| Verify Sepolia deployment on Sourcify | `pnpm verify:sepolia:sourcify` |
+| Run Sepolia smoke test | `pnpm smoke:sepolia` |
+| Start Anvil Sepolia fork | `pnpm fork:sepolia:anvil` |
+| Run Anvil expiry check | `pnpm fork:sepolia:expire` |
 
-There is currently **no app/dev server command** and no deploy script in `package.json` yet.
+There is still **no app/dev server command**, but deployment and verification commands are present in `package.json`.
 
 ## ENVIRONMENT
 From `.env.example`:
 - `DEPLOYER_PRIVATE_KEY`
 - `BASE_SEPOLIA_RPC_URL`
 - `BASE_MAINNET_RPC_URL`
-- `BASESCAN_API_KEY`
+- `BASESCAN_API_KEY` (optional for the adopted Sepolia Sourcify path; still relevant for explorer verification flows)
 - `VRF_SUBSCRIPTION_ID`
+- `VRF_SUBSCRIPTION_ID_MAINNET`
+- `SEPOLIA_TOKEN_ADDRESS`
+- `MAINNET_TOKEN_ADDRESS`
+- `SEPOLIA_REHEARSAL_TOKEN_ADDRESS`
+- `SEPOLIA_REHEARSAL_EXTRA_MINT_AMOUNT`
+- `SEPOLIA_INITIAL_BANKROLL_AMOUNT`
+- `MAINNET_INITIAL_BANKROLL_AMOUNT`
 - `INITIAL_BANKROLL_AMOUNT`
+- `SEPOLIA_SMOKE_DEPOSIT_AMOUNT`
+- `SEPOLIA_SMOKE_PASS_LINE_BET`
+- `SEPOLIA_SMOKE_WITHDRAW_AMOUNT`
 
 Hardhat config also expects:
 - `REPORT_GAS=true` to enable gas reporter

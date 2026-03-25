@@ -4,7 +4,7 @@
     "vrfCoordinator": "0x5C210eF41CD1a72de73bF76eC39637bB0d3d7BEE",
     "linkToken": "0xE4aB69C077896252FAFBD49EFD26B5D171A32410",
     "subscriptionId": "0",
-    "keyHash": "0x9e9e46732b32662b9adc6f3abdf6c5e926a666d6b7a39d3a50b33ff4f6f56f9",
+    "keyHash": "0x9e1344a1247c8a1785d0a4681a27152bffdb43666ae5bf7d14d24a5efd44bf71",
     "tokenDecimals": 6,
     "initialBankrollAmount": "50000000000",
     "debug": false

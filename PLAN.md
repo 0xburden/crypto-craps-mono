@@ -62,7 +62,7 @@ craps/
 │       └── CrapsModule.ts
 ├── scripts/
 │   ├── fund-vrf.ts                # Fund VRF subscription
-│   ├── verify.ts                  # Basescan verification
+│   ├── verify.ts                  # Explorer verification helper (mainnet / optional Sepolia)
 │   ├── check-pending.ts           # Query pending VRF request count
 │   └── check-link-balance.ts      # Query VRF subscription LINK balance, warn if low
 ├── slither.config.json
@@ -1325,9 +1325,9 @@ event BankrollAutoPaused(uint256 currentBankroll);
 
 1. Replace mock VRF with Chainlink VRF v2.5 on BASE Sepolia
 2. Verify callback soft-return on expired sessions (address(0) case)
-3. Deploy to BASE Sepolia via Hardhat Ignition
+3. Deploy to BASE Sepolia via Hardhat Ignition using the project's mintable rehearsal token for the adopted testnet workflow
 4. Fund VRF subscription with testnet LINK
-5. Verify on Basescan
+5. Publish sources on Sourcify for the Sepolia deployment
 6. End-to-end testing on testnet with real VRF
 7. **Gate:** 50+ successful rolls on testnet, gas profiling within budget, expired-session callback tested
 
@@ -1742,7 +1742,7 @@ When a new contract version is deployed and the old contract is paused:
 - [ ] `activeSessions` counter is observability-only — never used in require checks
 - [ ] No proxy, no `delegatecall`, no `selfdestruct` — fully immutable
 - [ ] Events emitted for all state changes with proper indexed parameters (see Event Indexing Strategy)
-- [ ] Constructor parameters verified on Basescan match intended values
+- [ ] Constructor parameters verified on the chosen public verifier match intended values (Sourcify on Sepolia, Basescan on mainnet)
 - [ ] Seven-out sweeps ALL Place bets regardless of ON/OFF toggle state
 - [ ] Come-out 7 kills Place bets and Hardways (not just seven-out during point phase)
 - [ ] Callback iterates ALL bet slots on EVERY roll regardless of session phase

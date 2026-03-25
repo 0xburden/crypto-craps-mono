@@ -28,7 +28,21 @@ const config: HardhatUserConfig = {
       hardfork: "cancun",
       allowUnlimitedContractSize: true,
       blockGasLimit: 60_000_000,
-      gas: 30_000_000
+      gas: 30_000_000,
+      chains: {
+        84532: {
+          hardforkHistory: {
+            shanghai: 0,
+            cancun: 1
+          }
+        },
+        8453: {
+          hardforkHistory: {
+            shanghai: 0,
+            cancun: 1
+          }
+        }
+      }
     },
     baseSepolia: {
       url: process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org",
@@ -44,28 +58,12 @@ const config: HardhatUserConfig = {
     }
   },
   etherscan: {
-    apiKey: {
-      baseSepolia: BASESCAN_API_KEY,
-      base: BASESCAN_API_KEY
-    },
-    customChains: [
-      {
-        network: "baseSepolia",
-        chainId: 84532,
-        urls: {
-          apiURL: "https://api-sepolia.basescan.org/api",
-          browserURL: "https://sepolia.basescan.org"
-        }
-      },
-      {
-        network: "base",
-        chainId: 8453,
-        urls: {
-          apiURL: "https://api.basescan.org/api",
-          browserURL: "https://basescan.org"
-        }
-      }
-    ]
+    apiKey: BASESCAN_API_KEY
+  },
+  sourcify: {
+    enabled: true,
+    apiUrl: "https://sourcify.dev/server",
+    browserUrl: "https://repo.sourcify.dev"
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS === "true",

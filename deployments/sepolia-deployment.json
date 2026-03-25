@@ -1,0 +1,19 @@
+{
+  "contractName": "CrapsGame",
+  "contractAddress": "0x6cBA1d9071c6900fE55a0aBf93dAaD363Da8919A",
+  "network": "baseSepolia",
+  "chainId": 84532,
+  "deploymentId": "sepolia",
+  "moduleId": "CrapsGameModule",
+  "tokenAddress": "0x8eb2C48C23fdaF506Eb6CB0397A3861AdA57a9dA",
+  "vrfCoordinator": "0x5C210eF41CD1a72de73bF76eC39637bB0d3d7BEE",
+  "linkToken": "0xE4aB69C077896252FAFBD49EFD26B5D171A32410",
+  "vrfSubscriptionId": "21125113605527230557476061461023679129743040007987767634885516918701967522421",
+  "keyHash": "0x9e1344a1247c8a1785d0a4681a27152bffdb43666ae5bf7d14d24a5efd44bf71",
+  "tokenDecimals": 6,
+  "initialBankrollAmount": "50000000000",
+  "debug": false,
+  "usesMocks": false,
+  "generatedAt": "2026-03-23T05:36:41.803Z",
+  "paramsFile": "/Users/burden/code/crypto-craps-mono/deployments/generated/sepolia-params.generated.json"
+}

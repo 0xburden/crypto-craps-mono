@@ -1,0 +1,11 @@
+{
+  "contractName": "MockERC20",
+  "tokenAddress": "0x8eb2C48C23fdaF506Eb6CB0397A3861AdA57a9dA",
+  "network": "baseSepolia",
+  "chainId": 84532,
+  "deployer": "0x20C04Acbf944a6dB9FA97782A06b21680b8D1A5E",
+  "name": "Sepolia Rehearsal USD",
+  "symbol": "srUSDC",
+  "decimals": 6,
+  "generatedAt": "2026-03-23T05:35:42.018Z"
+}

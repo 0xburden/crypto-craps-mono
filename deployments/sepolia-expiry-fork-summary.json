@@ -1,0 +1,25 @@
+{
+  "generatedAt": "2026-03-23T16:29:24.144Z",
+  "deploymentPath": "/Users/burden/code/crypto-craps-mono/deployments/sepolia-deployment.json",
+  "reportPath": "/Users/burden/code/crypto-craps-mono/deployments/sepolia-expiry-fork-findings.md",
+  "gameContract": "0x6cBA1d9071c6900fE55a0aBf93dAaD363Da8919A",
+  "player": "0x20C04Acbf944a6dB9FA97782A06b21680b8D1A5E",
+  "before": {
+    "phase": "1",
+    "available": "107500000",
+    "inPlay": "0",
+    "reserved": "0",
+    "pendingRequestId": "0"
+  },
+  "after": {
+    "phase": "0",
+    "available": "107500000",
+    "inPlay": "0",
+    "reserved": "0",
+    "pendingRequestId": "0"
+  },
+  "expectedAvailableIncrease": "0",
+  "actualAvailableIncrease": "0",
+  "expireTxHash": "0x7cc0157877ebe0f62d147a8ba803f436376b8311523616533edab7f34ada75ef",
+  "withdrawTxHash": "0xb48bbad16e31453e626a929f70e82e973fe098ca2fe5e1ddb651f359238c529b"
+}

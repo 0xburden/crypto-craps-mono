@@ -5,5 +5,7 @@ coverage/
 typechain-types/
 dist/
 audit/reports/
+deployments/generated/
+deployments/last-smoke-summary.json
 .env
 *.tsbuildinfo
