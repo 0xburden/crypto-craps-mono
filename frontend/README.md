@@ -1,6 +1,4 @@
-# Frontend — crypto-craps on BASE
-
-## Overview
+# crypto-craps frontend
 
 React + TypeScript application providing a full on-chain craps player interface on BASE.
 Wallet connects → deposit → bet → roll → withdraw cycle runs entirely through the deployed
@@ -10,168 +8,164 @@ Wallet connects → deposit → bet → roll → withdraw cycle runs entirely th
 
 | Library | Purpose |
 |---|---|
-| **Vite** | Build tooling, dev server |
+| **Vite 6** | Build tooling, dev server |
 | **React 18** | UI framework |
 | **wagmi v2** | Wallet connection hooks, contract read/write |
 | **viem v2** | ABI encoding, EVM type utilities |
-| **RainbowKit** | Wallet connector UI (MetaMask, Coinbase Wallet, WalletConnect) |
-| **TailwindCSS** | Styling |
+| **RainbowKit v2** | Wallet connector UI (MetaMask, Coinbase Wallet, WalletConnect) |
+| **TailwindCSS v4** | Styling |
 
 ## Networks
 
 | Network | Chain ID | Purpose |
 |---|---|---|
-| BASE Sepolia | 84532 | Primary testnet |
-| BASE Mainnet | 8453 | Production |
+| BASE Sepolia | 84532 | Primary testnet — **deployed** |
+| BASE Mainnet | 8453 | Production — address TBD (Phase 10) |
 
-## Setup
-
-```bash
-# 1. Install dependencies
-cd frontend
-pnpm install
-
-# 2. Configure environment
-cp .env.example .env
-# Fill in VITE_WALLET_CONNECT_PROJECT_ID (WalletConnect Cloud project)
-# Fill in VITE_SEPOLIA_CONTRACT_ADDRESS (deployed CrapsGame on Sepolia)
-# Fill in VITE_MAINNET_CONTRACT_ADDRESS (deployed CrapsGame on Mainnet)
-# Fill in VITE_SEPOLIA_TOKEN_ADDRESS (USDC or rehearsal token on Sepolia)
-
-# 3. Start dev server
-pnpm dev
-```
-
-## Build
+## Quick Start
 
 ```bash
-pnpm build   # production build to frontend/dist/
-pnpm preview # preview production build locally
+# Install frontend dependencies (from repo root)
+pnpm frontend:install
+
+# Configure environment
+cp frontend/.env.example frontend/.env
+# Edit frontend/.env — at minimum set VITE_WALLET_CONNECT_PROJECT_ID
+
+# Development server (http://localhost:5173)
+pnpm frontend:dev
+
+# Production build
+pnpm frontend:build
+
+# Preview production build locally
+pnpm frontend:preview
 ```
+
+**From repo root after contract changes:**
+```bash
+pnpm export:abi   # copies ABI to frontend/src/abi/CrapsGame.json
+pnpm frontend:build
+```
+
+## Pre-configured Contract Addresses
+
+| Network | CrapsGame | Token | Notes |
+|---|---|---|---|
+| BASE Sepolia | `0x6cBA1d9071c6900fE55a0aBf93dAaD363Da8919A` | `0x8eb2C48C23fdaF506Eb6CB0397A3861AdA57a9dA` (srUSDC rehearsal) | Live deployment |
+| BASE Mainnet | TBD | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` (Circle USDC) | Phase 10 |
+
+Set `VITE_SEPOLIA_CONTRACT_ADDRESS` and `VITE_SEPOLIA_TOKEN_ADDRESS` in `frontend/.env`
+before running against Sepolia.
+
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `VITE_WALLET_CONNECT_PROJECT_ID` | Yes | — | WalletConnect Cloud project ID |
+| `VITE_SEPOLIA_CONTRACT_ADDRESS` | Yes | `0x6cBA1d9071c6900fE55a0aBf93dAaD363Da8919A` | CrapsGame on Sepolia |
+| `VITE_MAINNET_CONTRACT_ADDRESS` | No | empty | CrapsGame on mainnet (fill after Phase 10) |
+| `VITE_SEPOLIA_TOKEN_ADDRESS` | Yes | `0x8eb2C48C23fdaF506Eb6CB0397A3861AdA57a9dA` | USDC/rehearsal token on Sepolia |
+| `VITE_MAINNET_TOKEN_ADDRESS` | No | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | Circle USDC on BASE mainnet |
+| `VITE_DEFAULT_CHAIN` | No | `baseSepolia` | Default chain on load (`baseSepolia` or `base`) |
 
 ## Contract Integration
 
 ### ABI
 
-The `CrapsGame.json` ABI is placed under `src/abi/`. It is sourced from `artifacts/contracts/CrapsGame.sol/CrapsGame.json`
-via the `pnpm export:abi` script at the repo root.
+`frontend/src/abi/CrapsGame.json` — exported from `artifacts/contracts/CrapsGame.sol/CrapsGame.json`
+via `pnpm export:abi` at the repo root.
 
-```bash
-# Re-export ABI after contract changes
-pnpm export:abi
+### Primary State
+
+All UI state is fetched through a single view call:
+
+```
+getPlayerState(address player) → PlayerState { phase, puckState, point, lastActivityTime,
+  pendingRequestId, available, inPlay, reserved, bankroll, totalBankroll,
+  initialBankroll, accruedFees, paused, selfExcluded, operatorExcluded,
+  reinstatementEligibleAt, bets }
 ```
 
-### Key Contract Data
+Call after every transaction confirmation and after every contract event.
 
-| Item | Sepolia value | Source |
+### Core Write Functions
+
+| Action | Function | Notes |
 |---|---|---|
-| CrapsGame address | `0x6cBA1d9071c6900fE55a0aBf93dAaD363Da8919A` | `deployments/sepolia-deployment.json` |
-| Token (rehearsal srUSDC) | `0x8eb2C48C23fdaF506Eb6CB0397A3861AdA57a9dA` | `deployments/sepolia-deployment.json` |
-| VRF Coordinator | `0x5C210eF41CD1a72de73bF76eC39637bB0d3d7BEE` | `deployments/sepolia-deployment.json` |
-| Key Hash (30 gwei) | `0x9e1344a1247c8a1785d0a4681a27152bffdb43666ae5bf7d14d24a5efd44bf71` | `deployments/sepolia-deployment.json` |
+| Deposit | `deposit(amount)` | Requires prior `approve()` on the token |
+| Withdraw | `withdraw(amount)` | Always available, even when paused/excluded |
+| Open session | `openSession()` | No active session, not excluded |
+| Close session | `closeSession()` | Not `ROLL_PENDING` |
+| Place bet | `placeBet(betType, amount)` | Validates min/max/multiple, puck state |
+| Place indexed bet | `placeIndexedBet(betType, index, amount)` | Come/Don't Come at slot 0–3 |
+| Remove bet | `removeBet(betType)` | Don't Pass, Odds, Place, Hardway, Props |
+| Remove indexed bet | `removeIndexedBet(betType, index)` | Come/Don't Come slot |
+| Toggle Place ON/OFF | `setPlaceWorking(placeNumber, working)` | |
+| Roll dice | `rollDice()` | Emits `RollRequested`; waits for VRF |
+| Self-exclude | `selfExclude()` | Immediate; session ended, bets returned |
+| Request reinstatement | `requestSelfReinstatement()` | Eligible after 7 days |
+| Complete reinstatement | `completeSelfReinstatement()` | Clears exclusion after delay |
 
-### Primary State Hook
-
-All contract state is fetched through a single view call:
+### Bet Type Enum Index
 
 ```
-getPlayerState(address player) → PlayerState
+ 0  PASS_LINE        13 PLACE_10
+ 1  PASS_LINE_ODDS  14 FIELD
+ 2  DONT_PASS       15 HARD_4
+ 3  DONT_PASS_ODDS  16 HARD_6
+ 4  COME            17 HARD_8
+ 5  COME_ODDS       18 HARD_10
+ 6  DONT_COME       19 ANY_7
+ 7  DONT_COME_ODDS  20 ANY_CRAPS
+ 8  PLACE_4         21 CRAPS_2
+ 9  PLACE_5         22 CRAPS_3
+10  PLACE_6         23 YO (11)
+11  PLACE_8         24 TWELVE
+12  PLACE_9         25 HORN
 ```
 
-This returns session phase, puck state, point, balances, all active bet slots, exclusion
-status, and house bankroll context in one RPC call. The frontend calls this after every
-transaction confirmation and after every relevant contract event.
+### Contract Events
 
-### Core Write Operations
-
-| Action | Function |
+| Event | UI reaction |
 |---|---|
-| Deposit | `deposit(amount)` — token approval required first |
-| Withdraw | `withdraw(amount)` |
-| Open session | `openSession()` |
-| Close session | `closeSession()` |
-| Place bet | `placeBet(betType, amount)` |
-| Remove bet | `removeBet(betType)` |
-| Place indexed bet | `placeIndexedBet(betType, index, amount)` |
-| Remove indexed bet | `removeIndexedBet(betType, index)` |
-| Toggle place working | `setPlaceWorking(placeNumber, working)` |
-| Roll dice | `rollDice()` — emits `RollRequested` |
-| Self-exclude | `selfExclude()` |
-| Request reinstatement | `requestSelfReinstatement()` |
-| Complete reinstatement | `completeSelfReinstatement()` |
+| `RollRequested(requestId, reservedAmount)` | Enter ROLL_PENDING state, disable betting |
+| `RollResolved(requestId, die1, die2, payout)` | Show dice, then `getPlayerState` to refresh |
+| `BetPlaced(betType, amount)` | Update chip on table |
+| `BetRemoved(betType, amount)` | Remove chip, credit balance |
+| `SessionOpened` | Hydrate active session |
+| `SessionClosed / SessionExpired` | Clear table, prompt to deposit/withdraw |
+| `SelfExcluded` | Show exclusion screen, enable withdraw only |
 
-### Bet Types (enum index)
+> **Important:** TASKS.md task 9.5 originally referenced `RollResult`. The contract emits
+> `RollResolved` — subscribe to the correct event name or roll results will be silently missed.
 
-```
-0  PASS_LINE
-1  PASS_LINE_ODDS
-2  DONT_PASS
-3  DONT_PASS_ODDS
-4  COME
-5  COME_ODDS
-6  DONT_COME
-7  DONT_COME_ODDS
-8  PLACE_4
-9  PLACE_5
-10 PLACE_6
-11 PLACE_8
-12 PLACE_9
-13 PLACE_10
-14 FIELD
-15 HARD_4
-16 HARD_6
-17 HARD_8
-18 HARD_10
-19 ANY_7
-20 ANY_CRAPS
-21 CRAPS_2
-22 CRAPS_3
-23 YO (11)
-24 TWELVE
-25 HORN
-```
+### Token
 
-## Events to Watch
+The Sepolia deployment uses the project's **rehearsal token** (`srUSDC`, 6 decimals) at
+`0x8eb2C48C23fdaF506Eb6CB0397A3861AdA57a9dA`. It is mintable by the deployer.
+**Not** Circle USDC on BASE Sepolia (`0x036CbD53842c5426634e7929541eC2318f3dCF7e`).
 
-| Event | Significance |
-|---|---|
-| `RollRequested` | Roll submitted; UI enters ROLL_PENDING state |
-| `RollResolved(die1, die2, payout)` | Roll result; UI shows dice, then refreshes state |
-| `BetPlaced` | Bet confirmed on-surface |
-| `BetRemoved` | Bet returned to available balance |
-| `SessionOpened` / `SessionClosed` | Session lifecycle |
-| `SessionExpired` | Bets returned; prompt to start new session |
-| `SelfExcluded` | Player locked out of betting |
+Deposit fee: **0.5%** (`DEPOSIT_FEE_BPS = 50` in contract).
 
-> **Note:** The contract emits `RollResolved` — not `RollResult`. TASKS.md originally used the
-> name `RollResult`; frontend code must subscribe to the correctly-named event.
+### Session Timer
 
-## Session Timer
+Sessions expire **24 hours** after the last roll (`lastActivityTime` in `PlayerState`).
+Display countdown in the header; warn at 1 hour and 15 minutes remaining.
+Any successful `RollResolved` resets the timer.
 
-`lastActivityTime` resets on every `RollResolved`. Sessions expire after 24 hours of
-inactivity. The frontend should display a countdown and warn at 1 hour and 15 minutes
-remaining.
+### Mobile
 
-## Token
+The game UI is landscape-first. A full-screen prompt instructs portrait users to rotate.
+The game does not render in portrait orientation.
 
-The Sepolia deployment uses the project's custom mintable rehearsal token (`srUSDC`, 6 decimals),
-not Circle's official USDC on BASE Sepolia. The token address is stored in
-`VITE_SEPOLIA_TOKEN_ADDRESS` / `deployments/sepolia-deployment.json`.
+## QA Notes (Spec Drift)
 
-The deposit fee is **0.5%** (`DEPOSIT_FEE_BPS = 50`).
+- `BankrollWarning` / `BankrollCritical` events are **not** in the contract. Bankroll
+  health UI must use `PlayerState.bankroll / PlayerState.initialBankroll`.
+- `initialBankroll` is **constant-backed** (`INITIAL_BANKROLL` Solidity constant), not a
+  live deployment-tracked value.
+- `token()` view function exists — call it on mount to validate the bound token matches
+  `VITE_SEPOLIA_TOKEN_ADDRESS`.
 
-## Mobile
-
-The game UI is landscape-first. On viewports narrower than the landscape threshold, a full-screen
-overlay prompts the user to rotate their device. The game UI does not render in portrait.
-
-## Environment Variables
-
-```bash
-VITE_WALLET_CONNECT_PROJECT_ID=   # WalletConnect Cloud project ID (required for wallet connect)
-VITE_SEPOLIA_CONTRACT_ADDRESS=    # CrapsGame on BASE Sepolia
-VITE_MAINNET_CONTRACT_ADDRESS=    # CrapsGame on BASE Mainnet
-VITE_SEPOLIA_TOKEN_ADDRESS=       # USDC or rehearsal token on Sepolia
-VITE_MAINNET_TOKEN_ADDRESS=       # USDC on BASE Mainnet (0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913)
-VITE_DEFAULT_CHAIN=baseSepolia    # 'baseSepolia' or 'base'
-```
+Full QA findings: `docs/phase9-validation.md`

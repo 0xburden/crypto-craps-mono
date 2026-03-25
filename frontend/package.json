@@ -1,0 +1,29 @@
+{
+  "name": "crypto-craps-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@rainbow-me/rainbowkit": "^2.2",
+    "react": "^18.3",
+    "react-dom": "^18.3",
+    "viem": "^2.21",
+    "wagmi": "^2.13"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0",
+    "@types/react": "^18.3",
+    "@types/react-dom": "^18.3",
+    "@vitejs/plugin-react": "^4.3",
+    "autoprefixer": "^10.4",
+    "tailwindcss": "^4.0",
+    "typescript": "^5.6",
+    "vite": "^6.0"
+  }
+}
