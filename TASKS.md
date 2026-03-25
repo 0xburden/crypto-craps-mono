@@ -389,7 +389,7 @@ the full player flow: connect wallet → deposit → play → withdraw.
 
 | ID | Task | Subagent hint | Status |
 |----|------|---------------|--------|
-| 9.1 | Scaffold React app in `frontend/` with wagmi v2 + viem v2 + RainbowKit; configure BASE Sepolia as primary chain, BASE Mainnet as secondary | Frontend agent | [~] |
+| 9.1 | Scaffold React app in `frontend/` with wagmi v2 + viem v2 + RainbowKit; configure BASE Sepolia as primary chain, BASE Mainnet as secondary | Frontend agent | [x] |
 | 9.2 | **Wallet & Balance component** — connect/disconnect wallet, display `_available` balance and `accruedFees` from `getPlayerState` | Frontend agent | [~] |
 | 9.3 | **Deposit/Withdraw component** — token approval + `deposit(amount)`; `withdraw(amount)`; display deposit fee clearly before confirming | Frontend agent | [~] |
 | 9.4 | **Game Table component** — craps table layout; all bet slots clickable; displays active bets, bet amounts, current point, puck state (ON/OFF) | Frontend agent | [~] |
