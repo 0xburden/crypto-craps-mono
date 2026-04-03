@@ -390,13 +390,13 @@ the full player flow: connect wallet → deposit → play → withdraw.
 | ID | Task | Subagent hint | Status |
 |----|------|---------------|--------|
 | 9.1 | Scaffold React app in `frontend/` with wagmi v2 + viem v2 + RainbowKit; configure BASE Sepolia as primary chain, BASE Mainnet as secondary | Frontend agent | [x] |
-| 9.2 | **Wallet & Balance component** — connect/disconnect wallet, display `_available` balance and `accruedFees` from `getPlayerState` | Frontend agent | [~] |
-| 9.3 | **Deposit/Withdraw component** — token approval + `deposit(amount)`; `withdraw(amount)`; display deposit fee clearly before confirming | Frontend agent | [~] |
-| 9.4 | **Game Table component** — craps table layout; all bet slots clickable; displays active bets, bet amounts, current point, puck state (ON/OFF) | Frontend agent | [~] |
-| 9.5 | **Roll & State Sync** — `rollDice()` button; poll `getPlayerState` after each transaction; display pending state while VRF resolves; update UI when callback fires (watch for `RollResult` event) | Frontend agent | [~] |
-| 9.6 | **Session management UI** — open/close session buttons; session timer showing time until expiry; self-exclusion option in settings panel | Frontend agent | [~] |
-| 9.7 | Export ABI from Hardhat artifacts into `frontend/src/abi/CrapsGame.json`; wire all contract interactions through a single `useCrapsGame` hook | Frontend agent | [~] |
-| 9.8 | **Exclusion / Responsible Gambling panel** — self-exclusion button with clear warning UX; 7-day reinstatement countdown; responsible gambling disclaimer | Frontend agent | [~] |
+| 9.2 | **Wallet & Balance component** — connect/disconnect wallet, display `_available` balance and `accruedFees` from `getPlayerState` | Frontend agent | [x] |
+| 9.3 | **Deposit/Withdraw component** — token approval + `deposit(amount)`; `withdraw(amount)`; display deposit fee clearly before confirming | Frontend agent | [x] |
+| 9.4 | **Game Table component** — craps table layout; all bet slots clickable; displays active bets, bet amounts, current point, puck state (ON/OFF) | Frontend agent | [x] |
+| 9.5 | **Roll & State Sync** — `rollDice()` button; poll `getPlayerState` after each transaction; display pending state while VRF resolves; update UI when callback fires (watch for `RollResult` event) | Frontend agent | [x] |
+| 9.6 | **Session management UI** — open/close session buttons; session timer showing time until expiry; self-exclusion option in settings panel | Frontend agent | [x] |
+| 9.7 | Export ABI from Hardhat artifacts into `frontend/src/abi/CrapsGame.json`; wire all contract interactions through a single `useCrapsGame` hook | Frontend agent | [x] |
+| 9.8 | **Exclusion / Responsible Gambling panel** — self-exclusion button with clear warning UX; 7-day reinstatement countdown; responsible gambling disclaimer | Frontend agent | [x] |
 | 9.9 | Connect frontend to BASE Sepolia deployment; end-to-end smoke test in browser | Frontend agent | [~] |
 
 **Phase 9 exit criteria:**
