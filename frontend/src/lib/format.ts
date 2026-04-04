@@ -42,6 +42,15 @@ export const parseUsdInput = (value: string) => {
   return parseUnits(trimmed, TOKEN_DECIMALS);
 };
 
+export const formatUsdInput = (value: bigint | null | undefined) => {
+  const normalized = formatUnits(value ?? 0n, TOKEN_DECIMALS);
+  if (!normalized.includes('.')) {
+    return normalized;
+  }
+
+  return normalized.replace(/0+$/u, '').replace(/\.$/u, '');
+};
+
 export const shortAddress = (value?: string) => {
   if (!value) {
     return 'Not connected';

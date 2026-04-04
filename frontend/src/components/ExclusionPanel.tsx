@@ -14,6 +14,7 @@ export const ExclusionPanel = ({
 }: ExclusionPanelProps) => {
   const state = game.playerState;
   const excluded = isExcluded(state);
+  const actionLocked = game.isTxPending;
 
   if (!state) {
     return (
@@ -51,16 +52,31 @@ export const ExclusionPanel = ({
             <div className="flex flex-wrap gap-3">
               <button
                 className="action-btn action-btn--secondary"
+                disabled={actionLocked}
                 onClick={() => void game.requestSelfReinstatement()}
               >
-                Request reinstatement
+                {actionLocked && game.txLabel === 'Request reinstatement' ? (
+                  <>
+                    <span className="action-btn__spinner" aria-hidden="true" />
+                    Requesting…
+                  </>
+                ) : (
+                  'Request reinstatement'
+                )}
               </button>
               <button
                 className="action-btn action-btn--primary"
-                disabled={!canComplete}
+                disabled={!canComplete || actionLocked}
                 onClick={() => void game.completeSelfReinstatement()}
               >
-                Complete reinstatement
+                {actionLocked && game.txLabel === 'Complete reinstatement' ? (
+                  <>
+                    <span className="action-btn__spinner" aria-hidden="true" />
+                    Completing…
+                  </>
+                ) : (
+                  'Complete reinstatement'
+                )}
               </button>
             </div>
           </div>
@@ -86,10 +102,17 @@ export const ExclusionPanel = ({
       </div>
       <button
         className="action-btn action-btn--danger mt-4 w-full"
-        disabled={!game.isConnected}
+        disabled={!game.isConnected || actionLocked}
         onClick={() => void game.selfExclude()}
       >
-        Self-exclude now
+        {actionLocked && game.txLabel === 'Self-exclude' ? (
+          <>
+            <span className="action-btn__spinner" aria-hidden="true" />
+            Processing…
+          </>
+        ) : (
+          'Self-exclude now'
+        )}
       </button>
     </section>
   );

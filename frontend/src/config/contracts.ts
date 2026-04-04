@@ -19,7 +19,9 @@ export const NETWORK_CONFIG = {
     chainId: baseSepolia.id,
     label: 'BASE Sepolia',
     gameAddress: parseOptionalAddress(
-      import.meta.env.VITE_BASE_SEPOLIA_GAME_ADDRESS ?? '0x6cBA1d9071c6900fE55a0aBf93dAaD363Da8919A',
+      import.meta.env.VITE_BASE_SEPOLIA_GAME_ADDRESS_V2 ??
+        import.meta.env.VITE_BASE_SEPOLIA_GAME_ADDRESS ??
+        '0xf031019A2A1DcEee8dAc3a7B9bf3066ced493292',
     ),
     tokenAddress: parseOptionalAddress(
       import.meta.env.VITE_BASE_SEPOLIA_TOKEN_ADDRESS ?? '0x8eb2C48C23fdaF506Eb6CB0397A3861AdA57a9dA',
@@ -30,7 +32,9 @@ export const NETWORK_CONFIG = {
   [base.id]: {
     chainId: base.id,
     label: 'BASE Mainnet',
-    gameAddress: parseOptionalAddress(import.meta.env.VITE_BASE_MAINNET_GAME_ADDRESS),
+    gameAddress: parseOptionalAddress(
+      import.meta.env.VITE_BASE_MAINNET_GAME_ADDRESS_V2 ?? import.meta.env.VITE_BASE_MAINNET_GAME_ADDRESS,
+    ),
     tokenAddress: parseOptionalAddress(
       import.meta.env.VITE_BASE_MAINNET_TOKEN_ADDRESS ?? '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
     ),

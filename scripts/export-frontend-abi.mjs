@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
-const artifactPath = resolve('artifacts/contracts/CrapsGame.sol/CrapsGame.json');
+const artifactPath = resolve('artifacts/contracts/CrapsGameV2.sol/CrapsGameV2.json');
 const outputPath = resolve('frontend/src/abi/CrapsGame.json');
 const artifact = JSON.parse(readFileSync(artifactPath, 'utf8'));
 

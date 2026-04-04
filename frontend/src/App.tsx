@@ -114,20 +114,28 @@ const App = () => {
           </div>
         </div>
 
-        <main className="mx-auto grid max-w-[1600px] gap-5 px-4 pb-8 lg:px-6 xl:grid-cols-[1.6fr_0.95fr]">
-          <div className="space-y-5">
-            <GameTable game={game} />
+        <div className="mx-auto max-w-[1600px] px-4 lg:px-6">
+          <div className="table-rail mb-4 rounded-2xl px-4 py-3 text-[0.72rem] uppercase tracking-[0.22em] text-slate-200/80">
+            Pass line · Don't Pass · Come · Don't Come · Place · Hardways · Props
           </div>
+        </div>
 
-          <aside className="space-y-5">
-            <WalletPanel game={game} />
-            <SessionPanel game={game} sessionRemainingSeconds={sessionRemainingSeconds} />
-            <RollHistoryPanel game={game} />
-            <ExclusionPanel
-              game={game}
-              reinstatementRemainingSeconds={reinstatementRemainingSeconds}
-            />
-          </aside>
+        <main className="mx-auto max-w-[1600px] px-4 pb-8 lg:px-6">
+          <div className="table-shell grid gap-5 rounded-[2.25rem] p-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(340px,0.92fr)]">
+            <div className="space-y-5">
+              <GameTable game={game} />
+            </div>
+
+            <aside className="space-y-5 xl:sticky xl:top-24 xl:self-start">
+              <SessionPanel game={game} sessionRemainingSeconds={sessionRemainingSeconds} />
+              <RollHistoryPanel game={game} />
+              <WalletPanel game={game} />
+              <ExclusionPanel
+                game={game}
+                reinstatementRemainingSeconds={reinstatementRemainingSeconds}
+              />
+            </aside>
+          </div>
         </main>
       </div>
     </LandscapeGate>

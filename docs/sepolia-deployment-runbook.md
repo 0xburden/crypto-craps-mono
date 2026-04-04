@@ -37,8 +37,12 @@ Recommended minimum live balances for one wallet handling deploy + smoke on the 
 ```bash
 pnpm prepare:deploy:sepolia
 pnpm deploy:sepolia
+pnpm deploy:sepolia:v2
 pnpm verify:sepolia:sourcify
+pnpm verify:sepolia:v2
+pnpm verify:sepolia:v2:sourcify
 pnpm smoke:sepolia
+pnpm smoke:sepolia:v2
 pnpm full:sepolia:rehearsal
 pnpm full:sepolia:rehearsal:smoke
 ```
@@ -84,6 +88,41 @@ Notes:
   - `SEPOLIA_REHEARSAL_EXTRA_MINT_AMOUNT`
 - Once `deployments/baseSepolia-rehearsal-token.json` exists, `pnpm deploy:sepolia` automatically uses that rehearsal token unless `SEPOLIA_TOKEN_ADDRESS` is explicitly set.
 - This is the adopted Sepolia testnet path recorded in `TASKS.md`.
+
+## V2 Sepolia status
+
+Deployed V2 addresses:
+- `CrapsGameV2`: `0xf031019A2A1DcEee8dAc3a7B9bf3066ced493292`
+- `RollResolutionV2`: `0x441fd20fA404C4EBb00c1c290925c2baF4998dB4`
+- rehearsal token (`srUSDC`): `0x8eb2C48C23fdaF506Eb6CB0397A3861AdA57a9dA`
+
+Deployment artifacts and reports:
+- deployment artifact: `deployments/sepolia-deployment-v2.json`
+- smoke findings: `deployments/sepolia-findings-v2.md`
+- smoke summary JSON: `deployments/last-smoke-summary-v2.json`
+
+Recommended V2 deploy/verify/smoke flow:
+
+```bash
+pnpm mint:sepolia:rehearsal-funds
+pnpm deploy:sepolia:v2
+pnpm verify:sepolia:v2:sourcify
+pnpm smoke:sepolia:v2
+```
+
+Current verification status:
+- `RollResolutionV2` verifies successfully.
+- `CrapsGameV2` verifies successfully on Basescan when submitted with the original full standard-json build input.
+- `CrapsGameV2` is available on Sourcify as a **partial match**.
+- The original Hardhat minimal-input verification path produced a bytecode mismatch on Basescan. The working V2 verify script now uses the full build-info input for `CrapsGameV2` instead.
+
+Current V2 smoke status:
+- live BASE Sepolia smoke passed using `executeTurn([PLACE_BET(PASS_LINE)], true)`
+- latest report timestamp: `2026-04-04T03:53:30.865Z`
+
+Frontend wiring note:
+- Set `VITE_BASE_SEPOLIA_GAME_ADDRESS_V2=0xf031019A2A1DcEee8dAc3a7B9bf3066ced493292` to point the frontend at the deployed V2 instance.
+- `frontend/src/config/contracts.ts` currently falls back to this deployed V2 Sepolia address.
 
 ## Phase 8 checklist mapping
 

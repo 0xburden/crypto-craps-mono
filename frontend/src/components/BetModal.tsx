@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { type BetTypeId, getBetInputRule } from '../lib/craps';
-import { formatUsd, parseUsdInput } from '../lib/format';
+import { BET_TYPES, type BetTypeId, getBetInputRule } from '../lib/craps';
+import { formatUsd, formatUsdInput, parseUsdInput } from '../lib/format';
 
 interface BetModalProps {
   open: boolean;
@@ -10,6 +10,9 @@ interface BetModalProps {
   currentAmount?: bigint;
   flatAmount?: bigint;
   point?: number;
+  isPending?: boolean;
+  pendingLabel?: string;
+  submitLabel?: string;
   onClose: () => void;
   onConfirm: (amount: bigint) => Promise<void>;
 }
@@ -22,6 +25,9 @@ export const BetModal = ({
   currentAmount = 0n,
   flatAmount = 0n,
   point = 0,
+  isPending = false,
+  pendingLabel,
+  submitLabel,
   onClose,
   onConfirm,
 }: BetModalProps) => {
@@ -81,9 +87,36 @@ export const BetModal = ({
     return null;
   })();
 
-  const quickAmounts = [rule.minAdditional, 25_000_000n, 50_000_000n, 100_000_000n]
+  const isPlaceFiveUnitBet =
+    betType === BET_TYPES.PLACE_4 ||
+    betType === BET_TYPES.PLACE_5 ||
+    betType === BET_TYPES.PLACE_9 ||
+    betType === BET_TYPES.PLACE_10;
+  const isPlaceSixUnitBet = betType === BET_TYPES.PLACE_6 || betType === BET_TYPES.PLACE_8;
+
+  const isPlaceBet = isPlaceFiveUnitBet || isPlaceSixUnitBet;
+
+  const quickAmounts = (
+    isPlaceFiveUnitBet
+      ? [5_000_000n, 10_000_000n, 15_000_000n, 25_000_000n]
+      : isPlaceSixUnitBet
+        ? [6_000_000n, 12_000_000n, 18_000_000n, 24_000_000n]
+        : [rule.minAdditional, 25_000_000n, 50_000_000n, 100_000_000n]
+  )
     .filter((entry, index, list) => entry > 0n && entry <= rule.maxAdditional && list.indexOf(entry) === index)
     .slice(0, 4);
+
+  const formatQuickAmountLabel = (entry: bigint) => (isPlaceBet ? formatUsdInput(entry) : formatUsd(entry));
+
+  const handleIncrement = () => {
+    const baseAmount = parsedAmount > 0n ? parsedAmount : 0n;
+    const nextAmount = baseAmount === 0n ? rule.minAdditional : baseAmount + rule.step;
+    const boundedAmount = nextAmount > rule.maxAdditional ? rule.maxAdditional : nextAmount;
+
+    if (boundedAmount > 0n) {
+      setAmount(formatUsdInput(boundedAmount));
+    }
+  };
 
   const handleSubmit = async () => {
     if (validationMessage) {
@@ -123,6 +156,7 @@ export const BetModal = ({
               className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
               inputMode="decimal"
               placeholder="0.00"
+              disabled={submitting || isPending}
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
             />
@@ -133,15 +167,26 @@ export const BetModal = ({
               <button
                 key={entry.toString()}
                 className="action-btn action-btn--secondary"
-                onClick={() => setAmount((Number(entry) / 1_000_000).toString())}
+                disabled={submitting || isPending}
+                onClick={() => setAmount(formatUsdInput(entry))}
               >
-                {formatUsd(entry)}
+                {formatQuickAmountLabel(entry)}
               </button>
             ))}
+            {rule.step > 1n && rule.maxAdditional > 0n && (
+              <button
+                className="action-btn action-btn--secondary"
+                disabled={submitting || isPending || parsedAmount >= rule.maxAdditional}
+                onClick={handleIncrement}
+              >
+                +{isPlaceBet ? formatUsdInput(rule.step) : formatUsd(rule.step)}
+              </button>
+            )}
             {rule.maxAdditional > 0n && (
               <button
                 className="action-btn action-btn--warning"
-                onClick={() => setAmount((Number(rule.maxAdditional) / 1_000_000).toString())}
+                disabled={submitting || isPending}
+                onClick={() => setAmount(formatUsdInput(rule.maxAdditional))}
               >
                 Max
               </button>
@@ -163,10 +208,17 @@ export const BetModal = ({
             </button>
             <button
               className="action-btn action-btn--primary"
-              disabled={submitting || Boolean(validationMessage)}
+              disabled={submitting || isPending || Boolean(validationMessage)}
               onClick={handleSubmit}
             >
-              {submitting ? 'Submitting…' : 'Confirm bet'}
+              {submitting || isPending ? (
+                <>
+                  <span className="action-btn__spinner" aria-hidden="true" />
+                  {pendingLabel ?? 'Submitting…'}
+                </>
+              ) : (
+                submitLabel ?? 'Confirm bet'
+              )}
             </button>
           </div>
         </div>

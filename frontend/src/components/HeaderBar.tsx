@@ -19,15 +19,18 @@ export const HeaderBar = ({ game, sessionRemainingSeconds }: HeaderBarProps) => 
       <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-4 py-4 lg:px-6 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-col gap-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-emerald-300/75">
-              Phase 9 frontend
-            </p>
             <h1 className="text-2xl font-semibold text-white">Crypto Craps</h1>
           </div>
           <div className="flex flex-wrap gap-2 text-xs text-slate-200/85">
             <span className="status-pill bg-emerald-500/10 text-emerald-300">
               {game.networkLabel}
             </span>
+            {game.isTxPending && (
+              <span className="status-pill bg-amber-500/10 text-amber-200">
+                <span className="action-btn__spinner" aria-hidden="true" />
+                {game.txLabel ?? 'Transaction pending'}
+              </span>
+            )}
             <span className="status-pill bg-white/5 text-slate-200">
               Phase: {getPhaseLabel(state?.phase)}
             </span>

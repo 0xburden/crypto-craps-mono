@@ -1,0 +1,27 @@
+{
+  "generatedAt": "2026-04-04T03:53:30.866Z",
+  "network": "baseSepolia",
+  "player": "0x20C04Acbf944a6dB9FA97782A06b21680b8D1A5E",
+  "deploymentPath": "/Users/burden/code/crypto-craps-mono/deployments/sepolia-deployment-v2.json",
+  "contractAddress": "0xf031019A2A1DcEee8dAc3a7B9bf3066ced493292",
+  "tokenAddress": "0x8eb2C48C23fdaF506Eb6CB0397A3861AdA57a9dA",
+  "depositAmount": "100000000",
+  "passLineBet": "10000000",
+  "withdrawAmount": "1000000",
+  "requestId": "78903960670305556825561293138219634643593448706515523923295624897703420915501",
+  "txHashes": {
+    "closeSession": "0xabf49c399eb0cb083463456513177ce170c2861e02ec138879df7ecf47c7e8b2",
+    "executeTurn": "0x4af0abb140a766fc99bd1c5a923b2bf0cb746cc22708713b41963c7827805f83",
+    "withdraw": "0x65d1ef70f69b054d72f8a6f6fc9fffedee026f99f29741fd5056458929f43b6b"
+  },
+  "finalState": {
+    "phase": "0",
+    "puckState": "0",
+    "point": "0",
+    "available": "109500000",
+    "inPlay": "0",
+    "reserved": "0",
+    "bankroll": "49990000000",
+    "accruedFees": "500000"
+  }
+}

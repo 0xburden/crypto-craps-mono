@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
+import { maxUint256 } from 'viem';
 import { DEPOSIT_FEE_BPS } from '../config/contracts';
 import { type UseCrapsGameResult } from '../hooks/useCrapsGame';
 import { calculateDepositPreview, isExcluded } from '../lib/craps';
-import { formatUsd, parseUsdInput } from '../lib/format';
+import { formatUsd, formatUsdInput, parseUsdInput } from '../lib/format';
 
 interface WalletPanelProps {
   game: UseCrapsGameResult;
@@ -31,7 +32,56 @@ export const WalletPanel = ({ game }: WalletPanelProps) => {
   const preview = calculateDepositPreview(depositParsed);
   const state = game.playerState;
   const excluded = isExcluded(state);
-  const depositDisabled = !game.isConnected || excluded || state?.paused;
+  const allowanceDisplay = game.allowance === maxUint256 ? 'Unlimited' : formatUsd(game.allowance);
+  const actionLocked = game.isTxPending;
+  const maxDepositInput = formatUsdInput(game.walletTokenBalance);
+  const hasEnoughWalletBalance = depositParsed <= game.walletTokenBalance;
+  const hasEnoughAllowance = depositParsed > 0n && depositParsed <= game.allowance;
+
+  const depositValidationMessage = (() => {
+    if (!game.isConnected) return 'Connect wallet to deposit.';
+    if (excluded) return 'Deposits are disabled while excluded.';
+    if (state?.paused) return 'Deposits are disabled while the table is paused.';
+    if (depositParsed <= 0n) return 'Enter a deposit amount greater than zero.';
+    if (!hasEnoughWalletBalance) {
+      return `Wallet balance is only ${formatUsd(game.walletTokenBalance)}.`;
+    }
+    if (!hasEnoughAllowance) {
+      return 'Approve the token for this amount before depositing.';
+    }
+    return null;
+  })();
+
+  const depositDisabled =
+    !game.isConnected || excluded || state?.paused || depositParsed <= 0n || !hasEnoughWalletBalance;
+
+  const handleDepositAmountChange = (value: string) => {
+    setDepositAmount(value);
+  };
+
+  const clampDepositAmountToWallet = () => {
+    try {
+      const parsed = parseUsdInput(depositAmount);
+      if (parsed > game.walletTokenBalance) {
+        setDepositAmount(maxDepositInput);
+      }
+    } catch {
+      // Preserve the current input and let existing validation handle malformed values.
+    }
+  };
+
+  const handleDepositAction = async () => {
+    if (depositDisabled) {
+      return;
+    }
+
+    if (hasEnoughAllowance) {
+      await game.deposit(depositParsed);
+      return;
+    }
+
+    await game.approveMax();
+  };
 
   return (
     <section className="felt-panel rounded-3xl p-5">
@@ -47,7 +97,7 @@ export const WalletPanel = ({ game }: WalletPanelProps) => {
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <StatRow label="Wallet" value={formatUsd(game.walletTokenBalance)} />
-        <StatRow label="Allowance" value={formatUsd(game.allowance)} />
+        <StatRow label="Allowance" value={allowanceDisplay} />
         <StatRow label="Available" value={formatUsd(state?.available)} />
         <StatRow label="Accrued fees" value={formatUsd(state?.accruedFees)} />
       </div>
@@ -58,20 +108,31 @@ export const WalletPanel = ({ game }: WalletPanelProps) => {
             <h3 className="font-semibold text-white">Deposit</h3>
             <button
               className="action-btn action-btn--secondary"
-              disabled={!game.isConnected || !game.contractAddress}
-              onClick={() => void game.approveMax()}
+              disabled={game.walletTokenBalance === 0n || actionLocked}
+              onClick={() => setDepositAmount(maxDepositInput)}
             >
-              Approve max
+              Max wallet
             </button>
           </div>
           <input
             className="mt-3 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
             inputMode="decimal"
+            max={maxDepositInput}
+            placeholder={maxDepositInput}
             value={depositAmount}
-            onChange={(event) => setDepositAmount(event.target.value)}
+            onBlur={clampDepositAmountToWallet}
+            onChange={(event) => handleDepositAmountChange(event.target.value)}
           />
           <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-3 text-sm text-slate-300">
             <p>
+              Wallet balance:{' '}
+              <span className="break-all font-semibold text-white">{formatUsd(game.walletTokenBalance)}</span>
+            </p>
+            <p className="mt-1">
+              Current allowance:{' '}
+              <span className="break-all font-semibold text-white">{allowanceDisplay}</span>
+            </p>
+            <p className="mt-2">
               Deposit fee ({DEPOSIT_FEE_BPS / 100}%): <span className="font-semibold text-white">{formatUsd(preview.fee)}</span>
             </p>
             <p className="mt-1">
@@ -79,12 +140,26 @@ export const WalletPanel = ({ game }: WalletPanelProps) => {
               <span className="font-semibold text-emerald-300">{formatUsd(preview.credited)}</span>
             </p>
           </div>
+          {depositValidationMessage && (
+            <p className={`mt-3 text-sm ${!hasEnoughWalletBalance ? 'text-rose-300' : 'text-slate-300'}`}>
+              {depositValidationMessage}
+            </p>
+          )}
           <button
             className="action-btn action-btn--primary mt-4 w-full"
-            disabled={depositDisabled || depositParsed <= 0n}
-            onClick={() => void game.deposit(depositParsed)}
+            disabled={depositDisabled || actionLocked}
+            onClick={() => void handleDepositAction()}
           >
-            Deposit {game.tokenSymbol}
+            {actionLocked && (game.txLabel === 'Deposit' || game.txLabel === 'Approve token') ? (
+              <>
+                <span className="action-btn__spinner" aria-hidden="true" />
+                {game.txLabel === 'Deposit' ? 'Depositing…' : 'Approving…'}
+              </>
+            ) : hasEnoughAllowance ? (
+              `Deposit ${game.tokenSymbol}`
+            ) : (
+              `Approve ${game.tokenSymbol}`
+            )}
           </button>
         </div>
 
@@ -93,7 +168,7 @@ export const WalletPanel = ({ game }: WalletPanelProps) => {
             <h3 className="font-semibold text-white">Withdraw</h3>
             <button
               className="action-btn action-btn--secondary"
-              disabled={(state?.available ?? 0n) === 0n}
+              disabled={(state?.available ?? 0n) === 0n || actionLocked}
               onClick={() => setWithdrawAmount(((state?.available ?? 0n) / 1_000_000n).toString())}
             >
               Withdraw all
@@ -110,10 +185,17 @@ export const WalletPanel = ({ game }: WalletPanelProps) => {
           </p>
           <button
             className="action-btn action-btn--primary mt-4 w-full"
-            disabled={!game.isConnected || withdrawParsed <= 0n}
+            disabled={!game.isConnected || withdrawParsed <= 0n || actionLocked}
             onClick={() => void game.withdraw(withdrawParsed)}
           >
-            Withdraw {game.tokenSymbol}
+            {actionLocked && game.txLabel === 'Withdraw' ? (
+              <>
+                <span className="action-btn__spinner" aria-hidden="true" />
+                Withdrawing…
+              </>
+            ) : (
+              <>Withdraw {game.tokenSymbol}</>
+            )}
           </button>
         </div>
       </div>
@@ -122,8 +204,8 @@ export const WalletPanel = ({ game }: WalletPanelProps) => {
 };
 
 const StatRow = ({ label, value }: { label: string; value: string }) => (
-  <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+  <div className="min-w-0 rounded-2xl border border-white/10 bg-black/20 p-3">
     <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
-    <p className="mt-1 font-semibold text-white">{value}</p>
+    <p className="mt-1 break-all font-semibold text-white">{value}</p>
   </div>
 );

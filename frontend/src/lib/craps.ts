@@ -27,6 +27,12 @@ export const BET_TYPES = {
   YO: 23,
   TWELVE: 24,
   HORN: 25,
+  LAY_4: 26,
+  LAY_5: 27,
+  LAY_6: 28,
+  LAY_8: 29,
+  LAY_9: 30,
+  LAY_10: 31,
 } as const;
 
 export const SESSION_PHASE = {
@@ -85,9 +91,24 @@ export interface BetDefinition {
   minTotal: bigint;
   maxTotal: bigint;
   multiple: bigint;
-  category: 'line' | 'odds' | 'place' | 'field' | 'hardway' | 'prop';
+  category: 'line' | 'odds' | 'place' | 'lay' | 'field' | 'hardway' | 'prop';
   number?: number;
   shortLabel?: string;
+}
+
+export type TurnActionKind =
+  | 'PLACE_BET'
+  | 'PLACE_INDEXED_BET'
+  | 'REMOVE_BET'
+  | 'REMOVE_INDEXED_BET'
+  | 'SET_BOX_WORKING';
+
+export interface TurnAction {
+  kind: TurnActionKind;
+  betType: BetTypeId;
+  index: number;
+  amount: bigint;
+  working: boolean;
 }
 
 const USD = 1_000_000n;
@@ -321,6 +342,66 @@ export const BET_DEFINITIONS: Record<string, BetDefinition> = {
     multiple: 4n * USD,
     category: 'prop',
   },
+  LAY_4: {
+    label: 'Lay 4',
+    shortLabel: 'L4',
+    betType: BET_TYPES.LAY_4,
+    minTotal: 2n * USD,
+    maxTotal: 500n * USD,
+    multiple: 2n * USD,
+    category: 'lay',
+    number: 4,
+  },
+  LAY_5: {
+    label: 'Lay 5',
+    shortLabel: 'L5',
+    betType: BET_TYPES.LAY_5,
+    minTotal: 3n * USD,
+    maxTotal: 500n * USD,
+    multiple: 3n * USD,
+    category: 'lay',
+    number: 5,
+  },
+  LAY_6: {
+    label: 'Lay 6',
+    shortLabel: 'L6',
+    betType: BET_TYPES.LAY_6,
+    minTotal: 6n * USD,
+    maxTotal: 500n * USD,
+    multiple: 6n * USD,
+    category: 'lay',
+    number: 6,
+  },
+  LAY_8: {
+    label: 'Lay 8',
+    shortLabel: 'L8',
+    betType: BET_TYPES.LAY_8,
+    minTotal: 6n * USD,
+    maxTotal: 500n * USD,
+    multiple: 6n * USD,
+    category: 'lay',
+    number: 8,
+  },
+  LAY_9: {
+    label: 'Lay 9',
+    shortLabel: 'L9',
+    betType: BET_TYPES.LAY_9,
+    minTotal: 3n * USD,
+    maxTotal: 500n * USD,
+    multiple: 3n * USD,
+    category: 'lay',
+    number: 9,
+  },
+  LAY_10: {
+    label: 'Lay 10',
+    shortLabel: 'L10',
+    betType: BET_TYPES.LAY_10,
+    minTotal: 2n * USD,
+    maxTotal: 500n * USD,
+    multiple: 2n * USD,
+    category: 'lay',
+    number: 10,
+  },
 };
 
 export const PLACE_BETS = [
@@ -337,6 +418,15 @@ export const HARDWAY_BETS = [
   BET_DEFINITIONS.HARD_6,
   BET_DEFINITIONS.HARD_8,
   BET_DEFINITIONS.HARD_10,
+];
+
+export const LAY_BETS = [
+  BET_DEFINITIONS.LAY_4,
+  BET_DEFINITIONS.LAY_5,
+  BET_DEFINITIONS.LAY_6,
+  BET_DEFINITIONS.LAY_8,
+  BET_DEFINITIONS.LAY_9,
+  BET_DEFINITIONS.LAY_10,
 ];
 
 export const PROP_BETS = [
@@ -385,6 +475,63 @@ export const calculateDepositPreview = (amount: bigint) => {
   };
 };
 
+export const getPlaceToggleMeta = (betType: BetTypeId) => {
+  switch (betType) {
+    case BET_TYPES.PLACE_4:
+      return { key: 'place4', number: 4 };
+    case BET_TYPES.PLACE_5:
+      return { key: 'place5', number: 5 };
+    case BET_TYPES.PLACE_6:
+      return { key: 'place6', number: 6 };
+    case BET_TYPES.PLACE_8:
+      return { key: 'place8', number: 8 };
+    case BET_TYPES.PLACE_9:
+      return { key: 'place9', number: 9 };
+    case BET_TYPES.PLACE_10:
+      return { key: 'place10', number: 10 };
+    default:
+      return null;
+  }
+};
+
+export const getLayToggleMeta = (betType: BetTypeId) => {
+  switch (betType) {
+    case BET_TYPES.LAY_4:
+      return { key: 'lay4', number: 4 };
+    case BET_TYPES.LAY_5:
+      return { key: 'lay5', number: 5 };
+    case BET_TYPES.LAY_6:
+      return { key: 'lay6', number: 6 };
+    case BET_TYPES.LAY_8:
+      return { key: 'lay8', number: 8 };
+    case BET_TYPES.LAY_9:
+      return { key: 'lay9', number: 9 };
+    case BET_TYPES.LAY_10:
+      return { key: 'lay10', number: 10 };
+    default:
+      return null;
+  }
+};
+
+export const describeTurnAction = (action: TurnAction) => {
+  const definition = Object.values(BET_DEFINITIONS).find((entry) => entry.betType === action.betType);
+
+  switch (action.kind) {
+    case 'PLACE_BET':
+      return `Add ${definition?.label ?? 'bet'}`;
+    case 'PLACE_INDEXED_BET':
+      return `Add ${definition?.label ?? 'bet'} #${action.index + 1}`;
+    case 'REMOVE_BET':
+      return `Remove ${definition?.label ?? 'bet'}`;
+    case 'REMOVE_INDEXED_BET':
+      return `Remove ${definition?.label ?? 'bet'} #${action.index + 1}`;
+    case 'SET_BOX_WORKING':
+      return `${action.working ? 'Enable' : 'Disable'} ${definition?.label ?? 'box bet'}`;
+    default:
+      return 'Turn action';
+  }
+};
+
 export const getOddsRequiredMultiple = (betType: BetTypeId, point: number) => {
   if (point === 4 || point === 10) {
     return betType === BET_TYPES.DONT_PASS_ODDS || betType === BET_TYPES.DONT_COME_ODDS
@@ -402,6 +549,22 @@ export const getOddsRequiredMultiple = (betType: BetTypeId, point: number) => {
     return betType === BET_TYPES.DONT_PASS_ODDS || betType === BET_TYPES.DONT_COME_ODDS
       ? 6n
       : 5n;
+  }
+
+  return 1n;
+};
+
+export const getLayRequiredMultiple = (betType: BetTypeId) => {
+  if (betType === BET_TYPES.LAY_4 || betType === BET_TYPES.LAY_10) {
+    return 2n * USD;
+  }
+
+  if (betType === BET_TYPES.LAY_5 || betType === BET_TYPES.LAY_9) {
+    return 3n * USD;
+  }
+
+  if (betType === BET_TYPES.LAY_6 || betType === BET_TYPES.LAY_8) {
+    return 6n * USD;
   }
 
   return 1n;
@@ -437,6 +600,26 @@ export const getBetInputRule = ({
     };
   }
 
+  if (betType === BET_TYPES.LAY_4 || betType === BET_TYPES.LAY_5 || betType === BET_TYPES.LAY_6 || betType === BET_TYPES.LAY_8 || betType === BET_TYPES.LAY_9 || betType === BET_TYPES.LAY_10) {
+    const definition = Object.values(BET_DEFINITIONS).find((entry) => entry.betType === betType);
+    if (!definition) {
+      return {
+        minAdditional: 0n,
+        maxAdditional: 0n,
+        step: 1n,
+        note: 'Unsupported bet type.',
+      };
+    }
+
+    const maxAdditional = definition.maxTotal - currentAmount;
+    return {
+      minAdditional: maxAdditional > 0n ? (currentAmount > 0n ? definition.multiple : definition.minTotal) : 0n,
+      maxAdditional: maxAdditional > 0n ? maxAdditional : 0n,
+      step: definition.multiple,
+      note: `${definition.label}: lays win on 7, lose on the box number, with 5% vig on win.`,
+    };
+  }
+
   const definition = Object.values(BET_DEFINITIONS).find((entry) => entry.betType === betType);
   if (!definition) {
     return {
@@ -454,6 +637,9 @@ export const getBetInputRule = ({
     minAdditional: maxAdditional > 0n ? minAdditional : 0n,
     maxAdditional: maxAdditional > 0n ? maxAdditional : 0n,
     step: definition.multiple,
-    note: `${definition.label}: min ${definition.minTotal.toString()} raw units, max ${definition.maxTotal.toString()} raw units.`,
+    note:
+      definition.category === 'lay'
+        ? `${definition.label}: lays win on 7, lose on the box number, with 5% vig on win.`
+        : `${definition.label}: min ${definition.minTotal.toString()} raw units, max ${definition.maxTotal.toString()} raw units.`,
   };
 };
