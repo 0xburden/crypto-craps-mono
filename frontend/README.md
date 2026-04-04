@@ -29,3 +29,4 @@ Minimal React + Vite frontend for Phase 9.
 - BASE Mainnet is configured as a secondary chain, but the game contract address is env-driven until mainnet deployment is complete.
 - The frontend watches the on-chain `RollResolved` event (the task list says `RollResult`, but the contract/interface use `RollResolved`).
 - Deposit/withdraw/roll/session flows are wired through the shared `useCrapsGame` hook.
+- Gameplay batching is enabled by default in the frontend: bet changes queue first, then `Confirm & Roll` submits `executeTurn(actions, true)`.

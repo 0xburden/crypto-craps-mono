@@ -478,7 +478,7 @@ export const GameTable = ({ game }: GameTableProps) => {
           flatAmount={modal.flatAmount}
           point={modal.point}
           isPending={game.isTxPending}
-          submitLabel={game.turnModeEnabled ? 'Queue bet' : 'Confirm bet'}
+          submitLabel={game.turnModeEnabled ? 'Add to turn' : 'Confirm bet'}
           pendingLabel={game.txLabel === 'Place bet' || game.txLabel === 'Place indexed bet' ? 'Confirming…' : undefined}
           onClose={() => setModal(null)}
           onConfirm={onConfirmModal}

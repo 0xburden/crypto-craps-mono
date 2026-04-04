@@ -1,3 +1,4 @@
+import { AccordionSection } from './AccordionSection';
 import { type UseCrapsGameResult } from '../hooks/useCrapsGame';
 import { describeTurnAction, getPhaseLabel, getPuckLabel, isExcluded, SESSION_PHASE } from '../lib/craps';
 import { formatCountdown, formatUsd } from '../lib/format';
@@ -47,7 +48,7 @@ export const SessionPanel = ({ game, sessionRemainingSeconds }: SessionPanelProp
         <div>
           <h2 className="text-lg font-semibold text-white">Session</h2>
           <p className="mt-1 text-sm text-slate-300">
-            Sessions open automatically on your first bet. Close and roll without leaving the table.
+            Sessions open automatically on your first bet. Bet changes queue by default so you can confirm them with one roll transaction.
           </p>
         </div>
         <span
@@ -112,55 +113,62 @@ export const SessionPanel = ({ game, sessionRemainingSeconds }: SessionPanelProp
         </button>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4 text-sm text-emerald-100">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-emerald-100/80">Turn composer</p>
-            <p className="mt-1 text-sm text-emerald-50/90">
-              Queue bet changes, then confirm them with the next roll.
-            </p>
-          </div>
-          <button
-            className={`action-btn ${game.turnModeEnabled ? 'action-btn--warning' : 'action-btn--secondary'}`}
-            disabled={actionLocked}
-            onClick={() => void game.setTurnModeEnabled(!game.turnModeEnabled)}
-          >
-            {game.turnModeEnabled ? 'Turn mode: ON' : 'Turn mode: OFF'}
-          </button>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            className="action-btn action-btn--secondary"
-            disabled={!hasQueuedTurn || actionLocked}
-            onClick={game.clearQueuedTurn}
-          >
-            Clear queued turn
-          </button>
-          {hasQueuedTurn && (
-            <span className="status-pill border border-emerald-200/30 bg-emerald-400/10 text-emerald-50">
-              {game.queuedTurnActions.length} action{game.queuedTurnActions.length === 1 ? '' : 's'} queued
-            </span>
-          )}
-        </div>
-
-        {hasQueuedTurn ? (
-          <div className="mt-4 space-y-2 rounded-2xl border border-emerald-300/20 bg-black/15 p-3 text-sm text-emerald-50">
-            {game.queuedTurnActions.map((action, index) => (
-              <div
-                key={`${action.kind}-${action.betType}-${action.index}-${index}`}
-                className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2"
-              >
-                <span>{describeTurnAction(action)}</span>
-                <span className="text-xs uppercase tracking-[0.2em] text-emerald-100/70">
-                  {index + 1}
-                </span>
+      <div className="mt-4">
+        <AccordionSection
+          title="Turn composer"
+          description="Collapsed by default. Review queued actions or temporarily disable batching."
+        >
+          <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4 text-sm text-emerald-100">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.24em] text-emerald-100/80">Turn composer</p>
+                <p className="mt-1 text-sm text-emerald-50/90">
+                  Bet changes are batched by default. Queue actions, then use Confirm & Roll for one gameplay confirmation.
+                </p>
               </div>
-            ))}
+              <button
+                className={`action-btn ${game.turnModeEnabled ? 'action-btn--warning' : 'action-btn--secondary'}`}
+                disabled={actionLocked}
+                onClick={() => void game.setTurnModeEnabled(!game.turnModeEnabled)}
+              >
+                {game.turnModeEnabled ? 'Batching: ON' : 'Batching: OFF'}
+              </button>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                className="action-btn action-btn--secondary"
+                disabled={!hasQueuedTurn || actionLocked}
+                onClick={game.clearQueuedTurn}
+              >
+                Clear queued turn
+              </button>
+              {hasQueuedTurn && (
+                <span className="status-pill border border-emerald-200/30 bg-emerald-400/10 text-emerald-50">
+                  {game.queuedTurnActions.length} action{game.queuedTurnActions.length === 1 ? '' : 's'} queued
+                </span>
+              )}
+            </div>
+
+            {hasQueuedTurn ? (
+              <div className="mt-4 space-y-2 rounded-2xl border border-emerald-300/20 bg-black/15 p-3 text-sm text-emerald-50">
+                {game.queuedTurnActions.map((action, index) => (
+                  <div
+                    key={`${action.kind}-${action.betType}-${action.index}-${index}`}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2"
+                  >
+                    <span>{describeTurnAction(action)}</span>
+                    <span className="text-xs uppercase tracking-[0.2em] text-emerald-100/70">
+                      {index + 1}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-emerald-50/80">No queued turn actions.</p>
+            )}
           </div>
-        ) : (
-          <p className="mt-3 text-sm text-emerald-50/80">No queued turn actions.</p>
-        )}
+        </AccordionSection>
       </div>
 
       <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-300">

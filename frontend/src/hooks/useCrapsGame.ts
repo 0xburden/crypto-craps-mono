@@ -524,8 +524,9 @@ export const useCrapsGame = (): UseCrapsGameResult => {
   const [rollHistory, setRollHistory] = useState<RollHistoryEntry[]>([]);
   const [lastResolvedRoll, setLastResolvedRoll] = useState<RollHistoryEntry | null>(null);
   const [isRolling, setIsRolling] = useState(false);
-  const [turnModeEnabled, setTurnModeEnabled] = useState(false);
+  const [turnModeEnabled, setTurnModeEnabled] = useState(true);
   const [queuedTurnActions, setQueuedTurnActions] = useState<TurnAction[]>([]);
+  const [pendingRollActions, setPendingRollActions] = useState<TurnAction[]>([]);
   const [txState, setTxState] = useState<{
     busy: boolean;
     label?: string;
@@ -595,10 +596,15 @@ export const useCrapsGame = (): UseCrapsGameResult => {
     setPlayerState(queriedPlayerState);
   }, [queriedPlayerState]);
 
-  const displayPlayerState = useMemo(
-    () => applyTurnActionsToState(playerState, queuedTurnActions),
-    [playerState, queuedTurnActions],
-  );
+  const displayPlayerState = useMemo(() => {
+    const overlayActions = queuedTurnActions.length > 0
+      ? queuedTurnActions
+      : playerState?.phase === SESSION_PHASE.ROLL_PENDING
+        ? pendingRollActions
+        : [];
+
+    return applyTurnActionsToState(playerState, overlayActions);
+  }, [pendingRollActions, playerState, queuedTurnActions]);
 
   const queueTurnAction = useCallback((action: TurnAction) => {
     setQueuedTurnActions((previous) => [...previous, action]);
@@ -850,6 +856,7 @@ export const useCrapsGame = (): UseCrapsGameResult => {
 
   const closeSession = useCallback(async () => {
     await writeGame('Close session', 'closeSession');
+    setPendingRollActions([]);
     setPlayerState((previous) => ({
       ...(previous ?? EMPTY_PLAYER_STATE),
       phase: SESSION_PHASE.INACTIVE,
@@ -863,8 +870,11 @@ export const useCrapsGame = (): UseCrapsGameResult => {
   const rollDice = useCallback(async () => {
     setIsRolling(true);
     try {
-      if (turnModeEnabled && queuedTurnActions.length > 0) {
-        await executeTurnActions('Confirm & Roll', queuedTurnActions, true);
+      const queuedActions = turnModeEnabled ? queuedTurnActions : [];
+      setPendingRollActions(queuedActions);
+
+      if (queuedActions.length > 0) {
+        await executeTurnActions('Confirm & Roll', queuedActions, true);
         setQueuedTurnActions([]);
       } else {
         await executeTurnActions('Roll dice', [], true);
@@ -881,6 +891,7 @@ export const useCrapsGame = (): UseCrapsGameResult => {
       );
     } catch (error) {
       setIsRolling(false);
+      setPendingRollActions([]);
       throw error;
     }
   }, [executeTurnActions, queuedTurnActions, turnModeEnabled]);
@@ -896,6 +907,7 @@ export const useCrapsGame = (): UseCrapsGameResult => {
 
   const clearQueuedTurn = useCallback(() => {
     setQueuedTurnActions([]);
+    setPendingRollActions([]);
   }, []);
 
   const setComposerMode = useCallback((enabled: boolean) => {
@@ -1274,6 +1286,7 @@ export const useCrapsGame = (): UseCrapsGameResult => {
 
           if (log.eventName === 'SessionClosed' || log.eventName === 'SessionExpired') {
             setQueuedTurnActions([]);
+            setPendingRollActions([]);
             setPlayerState((previous) => ({
               ...(previous ?? EMPTY_PLAYER_STATE),
               phase: SESSION_PHASE.INACTIVE,
@@ -1300,6 +1313,7 @@ export const useCrapsGame = (): UseCrapsGameResult => {
           }
 
           if (log.eventName === 'RollResolved') {
+            setPendingRollActions([]);
             appendResolvedRoll({
               id: `${String(log.args?.requestId ?? 0)}-${String(log.blockNumber ?? Date.now())}`,
               requestId: BigInt(log.args?.requestId ?? 0),
@@ -1404,10 +1418,12 @@ export const useCrapsGame = (): UseCrapsGameResult => {
       setRollHistory([]);
       setLastResolvedRoll(null);
       setIsRolling(false);
+      setPendingRollActions([]);
     }
 
     if (playerState.phase !== SESSION_PHASE.ROLL_PENDING) {
       setIsRolling(false);
+      setPendingRollActions([]);
     }
   }, [playerState]);
 
