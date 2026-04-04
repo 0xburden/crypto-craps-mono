@@ -6,5 +6,17 @@ export default defineConfig({
   server: {
     port: 5173,
     host: '0.0.0.0',
+    watch: {
+      usePolling: true,
+      interval: 120,
+      binaryInterval: 240,
+      awaitWriteFinish: {
+        stabilityThreshold: 75,
+        pollInterval: 25,
+      },
+    },
+    headers: {
+      'Cache-Control': 'no-store',
+    },
   },
 });

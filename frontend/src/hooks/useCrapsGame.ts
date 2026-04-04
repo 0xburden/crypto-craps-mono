@@ -1,15 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Abi, Address, Hex } from 'viem';
-import { maxUint256, parseAbiItem } from 'viem';
+import { decodeEventLog, maxUint256, parseAbiItem } from 'viem';
 import {
   useAccount,
   useChainId,
   usePublicClient,
   useReadContract,
   useSwitchChain,
+  useWaitForTransactionReceipt,
+  useWatchContractEvent,
   useWriteContract,
 } from 'wagmi';
 import { crapsGameV2Abi } from '../abi/crapsGameV2Abi';
+import { srUsdcAbi } from '../abi/srUsdcAbi';
 import { DEFAULT_CHAIN_ID, NETWORK_CONFIG } from '../config/contracts';
 import {
   BET_TYPES,
@@ -25,6 +28,9 @@ import {
 import { erc20Abi } from '../lib/erc20Abi';
 
 const crapsGameAbi = crapsGameV2Abi as Abi;
+const rollRequestedEvent = parseAbiItem(
+  'event RollRequested(address indexed player, uint256 indexed requestId, uint256 reservedAmount)'
+);
 const rollResolvedEvent = parseAbiItem(
   'event RollResolved(address indexed player, uint256 indexed requestId, uint8 die1, uint8 die2, uint256 payout)'
 );
@@ -38,6 +44,24 @@ const TURN_ACTION_KIND_IDS: Record<TurnActionKind, number> = {
   REMOVE_INDEXED_BET: 3,
   SET_BOX_WORKING: 4,
 };
+
+type RefreshTarget = 'playerState' | 'walletBalance' | 'allowance' | 'tokenMeta';
+
+type PendingTxMeta = {
+  hash: Hex;
+  label: string;
+  refreshTargets: RefreshTarget[];
+  preservePendingOnSync?: boolean;
+  onConfirmed?: () => void | Promise<void>;
+};
+
+const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+const shouldPreserveLocalPending = (
+  previous: NormalizedPlayerState | null,
+  next: NormalizedPlayerState,
+  preservePending: boolean,
+) => preservePending && previous?.phase === SESSION_PHASE.ROLL_PENDING && next.phase !== SESSION_PHASE.ROLL_PENDING;
 
 const serializeTurnAction = (action: TurnAction) => ({
   kind: TURN_ACTION_KIND_IDS[action.kind],
@@ -476,6 +500,9 @@ export interface UseCrapsGameResult {
   tokenDecimals: number;
   walletTokenBalance: bigint;
   allowance: bigint;
+  faucetMaxRequestAmount: bigint;
+  canRequestFaucet: boolean;
+  requestFaucet: (amount: bigint) => Promise<void>;
   playerState: NormalizedPlayerState | null;
   rollHistory: RollHistoryEntry[];
   lastResolvedRoll: RollHistoryEntry | null;
@@ -517,6 +544,7 @@ export const useCrapsGame = (): UseCrapsGameResult => {
   const network = NETWORK_CONFIG[activeChainId as keyof typeof NETWORK_CONFIG];
   const contractAddress = network.gameAddress;
   const tokenAddress = network.tokenAddress;
+  const canRequestFaucet = Boolean(isConnected && address && walletChainId === DEFAULT_CHAIN_ID && network.supportsFaucet);
   const publicClient = usePublicClient({ chainId: activeChainId });
   const { switchChainAsync } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
@@ -524,6 +552,8 @@ export const useCrapsGame = (): UseCrapsGameResult => {
   const [rollHistory, setRollHistory] = useState<RollHistoryEntry[]>([]);
   const [lastResolvedRoll, setLastResolvedRoll] = useState<RollHistoryEntry | null>(null);
   const [isRolling, setIsRolling] = useState(false);
+  const [optimisticRollPending, setOptimisticRollPending] = useState(false);
+  const [suppressPendingSync, setSuppressPendingSync] = useState(false);
   const [turnModeEnabled, setTurnModeEnabled] = useState(true);
   const [queuedTurnActions, setQueuedTurnActions] = useState<TurnAction[]>([]);
   const [pendingRollActions, setPendingRollActions] = useState<TurnAction[]>([]);
@@ -533,6 +563,20 @@ export const useCrapsGame = (): UseCrapsGameResult => {
     hash?: Hex;
     error?: string;
   }>({ busy: false });
+  const [pendingTxMeta, setPendingTxMeta] = useState<PendingTxMeta | null>(null);
+  const pendingTxPromiseRef = useRef<{
+    resolve: () => void;
+    reject: (error: unknown) => void;
+  } | null>(null);
+  const observedPendingRequestIdRef = useRef<bigint | null>(null);
+
+  const txReceiptQuery = useWaitForTransactionReceipt({
+    chainId: activeChainId,
+    hash: pendingTxMeta?.hash,
+    query: {
+      enabled: Boolean(pendingTxMeta?.hash),
+    },
+  });
 
   const playerStateQuery = useReadContract({
     address: contractAddress,
@@ -593,8 +637,36 @@ export const useCrapsGame = (): UseCrapsGameResult => {
   const [playerState, setPlayerState] = useState<NormalizedPlayerState | null>(null);
 
   useEffect(() => {
-    setPlayerState(queriedPlayerState);
-  }, [queriedPlayerState]);
+    setPlayerState((previous) => {
+      if (!queriedPlayerState) {
+        return null;
+      }
+
+      if (shouldPreserveLocalPending(previous, queriedPlayerState, optimisticRollPending)) {
+        return previous;
+      }
+
+      if (
+        suppressPendingSync &&
+        previous?.phase !== SESSION_PHASE.ROLL_PENDING &&
+        queriedPlayerState.phase === SESSION_PHASE.ROLL_PENDING
+      ) {
+        return previous;
+      }
+
+
+      if (queriedPlayerState.phase !== SESSION_PHASE.ROLL_PENDING) {
+        setIsRolling(false);
+        setOptimisticRollPending(false);
+      }
+
+      return queriedPlayerState;
+    });
+
+    if (suppressPendingSync && queriedPlayerState && queriedPlayerState.phase !== SESSION_PHASE.ROLL_PENDING) {
+      setSuppressPendingSync(false);
+    }
+  }, [optimisticRollPending, queriedPlayerState, suppressPendingSync]);
 
   const displayPlayerState = useMemo(() => {
     const overlayActions = queuedTurnActions.length > 0
@@ -610,17 +682,74 @@ export const useCrapsGame = (): UseCrapsGameResult => {
     setQueuedTurnActions((previous) => [...previous, action]);
   }, []);
 
-  const refresh = useCallback(async () => {
-    await Promise.allSettled([
-      playerStateQuery.refetch(),
-      walletBalanceQuery.refetch(),
-      allowanceQuery.refetch(),
-      symbolQuery.refetch(),
-      decimalsQuery.refetch(),
-    ]);
-  }, [allowanceQuery, decimalsQuery, playerStateQuery, symbolQuery, walletBalanceQuery]);
+  const refetchRelevantData = useCallback(
+    async (
+      targets: Array<'playerState' | 'walletBalance' | 'allowance' | 'tokenMeta'>,
+    ) => {
+      const uniqueTargets = Array.from(new Set(targets));
+      const tasks: Array<Promise<unknown>> = [];
 
-  const syncPlayerStateFromChain = useCallback(async () => {
+      if (uniqueTargets.includes('playerState')) {
+        tasks.push(playerStateQuery.refetch());
+      }
+
+      if (uniqueTargets.includes('walletBalance')) {
+        tasks.push(walletBalanceQuery.refetch());
+      }
+
+      if (uniqueTargets.includes('allowance')) {
+        tasks.push(allowanceQuery.refetch());
+      }
+
+      if (uniqueTargets.includes('tokenMeta')) {
+        tasks.push(symbolQuery.refetch(), decimalsQuery.refetch());
+      }
+
+      await Promise.allSettled(tasks);
+    },
+    [allowanceQuery, decimalsQuery, playerStateQuery, symbolQuery, walletBalanceQuery],
+  );
+
+  const refresh = useCallback(async () => {
+    await refetchRelevantData(['playerState', 'walletBalance', 'allowance', 'tokenMeta']);
+  }, [refetchRelevantData]);
+
+  const applyPlayerStateSnapshot = useCallback(
+    (normalized: NormalizedPlayerState, options?: { preservePending?: boolean }) => {
+      const preservePending = options?.preservePending ?? optimisticRollPending;
+
+      setPlayerState((previous) => {
+        if (shouldPreserveLocalPending(previous, normalized, preservePending)) {
+          return previous;
+        }
+
+        if (
+          suppressPendingSync &&
+          previous?.phase !== SESSION_PHASE.ROLL_PENDING &&
+          normalized.phase === SESSION_PHASE.ROLL_PENDING
+        ) {
+          return previous;
+        }
+
+
+        if (normalized.phase !== SESSION_PHASE.ROLL_PENDING) {
+          setIsRolling(false);
+          setOptimisticRollPending(false);
+        }
+
+        return normalized;
+      });
+
+      if (suppressPendingSync && normalized.phase !== SESSION_PHASE.ROLL_PENDING) {
+        setSuppressPendingSync(false);
+      }
+
+      return normalized;
+    },
+    [optimisticRollPending, suppressPendingSync],
+  );
+
+  const readPlayerStateFromChain = useCallback(async () => {
     if (!publicClient || !contractAddress || !address) {
       return null;
     }
@@ -632,13 +761,24 @@ export const useCrapsGame = (): UseCrapsGameResult => {
         functionName: 'getPlayerState',
         args: [address],
       });
-      const normalized = normalizePlayerState(raw);
-      setPlayerState(normalized);
-      return normalized;
+
+      return normalizePlayerState(raw);
     } catch {
       return null;
     }
   }, [address, contractAddress, publicClient]);
+
+  const syncPlayerStateFromChain = useCallback(
+    async (options?: { preservePending?: boolean }) => {
+      const normalized = await readPlayerStateFromChain();
+      if (!normalized) {
+        return null;
+      }
+
+      return applyPlayerStateSnapshot(normalized, options);
+    },
+    [applyPlayerStateSnapshot, readPlayerStateFromChain],
+  );
 
   const appendResolvedRoll = useCallback((entry: RollHistoryEntry) => {
     setLastResolvedRoll((previous) => {
@@ -708,6 +848,7 @@ export const useCrapsGame = (): UseCrapsGameResult => {
           at: Number(log.blockNumber ?? 0),
         }));
 
+
       setRollHistory(entries);
       setLastResolvedRoll(entries[0] ?? null);
 
@@ -717,12 +858,223 @@ export const useCrapsGame = (): UseCrapsGameResult => {
     }
   }, [address, contractAddress, publicClient]);
 
+  const syncPendingRequestFromReceipt = useCallback(
+    (receipt: { logs?: Array<{ address: Address; data: Hex; topics: readonly Hex[] }> } | undefined) => {
+      if (!receipt?.logs || !contractAddress || !address) {
+        return null;
+      }
+
+      for (const log of receipt.logs) {
+        if (log.address.toLowerCase() !== contractAddress.toLowerCase()) {
+          continue;
+        }
+
+        try {
+          const decoded = decodeEventLog({
+            abi: [rollRequestedEvent],
+            data: log.data,
+            topics: log.topics as [Hex, ...Hex[]],
+          });
+
+          if (decoded.eventName !== 'RollRequested') {
+            continue;
+          }
+
+          const player = decoded.args.player as Address | undefined;
+          if (!player || player.toLowerCase() !== address.toLowerCase()) {
+            continue;
+          }
+
+          const requestId = BigInt(decoded.args.requestId ?? 0);
+          if (requestId === 0n) {
+            continue;
+          }
+
+          observedPendingRequestIdRef.current = requestId;
+          setPlayerState((previous) =>
+            previous
+              ? {
+                  ...previous,
+                  phase: SESSION_PHASE.ROLL_PENDING,
+                  pendingRequestId: requestId,
+                  lastActivityTime: Math.floor(Date.now() / 1000),
+                }
+              : previous,
+          );
+          return requestId;
+        } catch {
+          // ignore unrelated logs
+        }
+      }
+
+      return null;
+    },
+    [address, contractAddress],
+  );
+
+  const syncRollHistoryAfterSettlement = useCallback(async () => {
+    const previousLatestRequestId = lastResolvedRoll?.requestId ?? null;
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const entries = await syncRollHistoryFromChain();
+      const latestRequestId = entries[0]?.requestId ?? null;
+
+
+      if (previousLatestRequestId === null) {
+        if (entries.length > 0) {
+          return entries;
+        }
+      } else if (latestRequestId !== null && latestRequestId !== previousLatestRequestId) {
+        return entries;
+      }
+
+      await sleep(500);
+    }
+
+    return [] as RollHistoryEntry[];
+  }, [lastResolvedRoll?.requestId, syncRollHistoryFromChain]);
+
+  const syncPlayerStateAfterResolution = useCallback(async () => {
+    let latestState: NormalizedPlayerState | null = null;
+
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      latestState = await readPlayerStateFromChain();
+
+      if (!latestState) {
+        return latestState;
+      }
+
+
+      applyPlayerStateSnapshot(latestState, { preservePending: false });
+
+      if (latestState.phase !== SESSION_PHASE.ROLL_PENDING && latestState.pendingRequestId === 0n) {
+        setOptimisticRollPending(false);
+        return latestState;
+      }
+
+      await sleep(350);
+    }
+
+    return latestState;
+  }, [applyPlayerStateSnapshot, readPlayerStateFromChain]);
+
+  const waitForResolvedRollByRequestId = useCallback(
+    async (requestId: bigint, fromBlock?: bigint) => {
+      if (!publicClient || !contractAddress || !address || requestId === 0n) {
+        return false;
+      }
+
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        try {
+          const latestBlock = await publicClient.getBlockNumber();
+          const searchFromBlock = fromBlock !== undefined
+            ? (fromBlock > 2n ? fromBlock - 2n : 0n)
+            : (latestBlock > 2_000n ? latestBlock - 2_000n : 0n);
+          const logs = await publicClient.getLogs({
+            address: contractAddress,
+            event: rollResolvedEvent,
+            args: {
+              player: address,
+              requestId,
+            },
+            fromBlock: searchFromBlock,
+            toBlock: latestBlock,
+          });
+
+          const resolvedLog = logs.at(-1) as
+            | {
+                args?: {
+                  requestId?: bigint;
+                  die1?: number;
+                  die2?: number;
+                  payout?: bigint;
+                };
+                blockNumber?: bigint;
+              }
+            | undefined;
+
+
+          if (resolvedLog) {
+            appendResolvedRoll({
+              id: `${String(resolvedLog.args?.requestId ?? requestId)}-${String(resolvedLog.blockNumber ?? Date.now())}`,
+              requestId: BigInt(resolvedLog.args?.requestId ?? requestId),
+              die1: Number(resolvedLog.args?.die1 ?? 0),
+              die2: Number(resolvedLog.args?.die2 ?? 0),
+              payout: BigInt(resolvedLog.args?.payout ?? 0),
+              at: Date.now(),
+            });
+
+            setIsRolling(false);
+            setOptimisticRollPending(false);
+            setSuppressPendingSync(true);
+            observedPendingRequestIdRef.current = null;
+            setPlayerState((previous) =>
+              previous
+                ? {
+                    ...previous,
+                    phase: previous.point === 0 ? SESSION_PHASE.COME_OUT : SESSION_PHASE.POINT,
+                    pendingRequestId: 0n,
+                    reserved: 0n,
+                    lastActivityTime: Math.floor(Date.now() / 1000),
+                  }
+                : previous,
+            );
+            await refresh();
+            await syncPlayerStateAfterResolution();
+            await syncRollHistoryFromChain();
+            return true;
+          }
+        } catch {
+          // continue polling
+        }
+
+        await sleep(1_000);
+      }
+
+      return false;
+    },
+    [address, appendResolvedRoll, contractAddress, publicClient, refresh, syncPlayerStateAfterResolution, syncRollHistoryFromChain],
+  );
+
+  const syncPendingRollRequestFromChain = useCallback(async () => {
+    let latestState: NormalizedPlayerState | null = null;
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      latestState = await readPlayerStateFromChain();
+
+      if (!latestState) {
+        return latestState;
+      }
+
+
+      if (latestState.phase === SESSION_PHASE.ROLL_PENDING && latestState.pendingRequestId !== 0n) {
+        observedPendingRequestIdRef.current = latestState.pendingRequestId;
+        void waitForResolvedRollByRequestId(latestState.pendingRequestId);
+        return applyPlayerStateSnapshot(latestState, { preservePending: true });
+      }
+
+      if (latestState.phase !== SESSION_PHASE.ROLL_PENDING) {
+        if (observedPendingRequestIdRef.current === null) {
+          await sleep(300);
+          continue;
+        }
+
+        await sleep(300);
+        continue;
+      }
+
+      await sleep(300);
+    }
+
+    return latestState;
+  }, [applyPlayerStateSnapshot, readPlayerStateFromChain, syncRollHistoryAfterSettlement, waitForResolvedRollByRequestId]);
+
   const syncResolvedRollForPendingRequest = useCallback(async () => {
     if (!publicClient || !contractAddress || !address) {
       return false;
     }
 
-    const pendingRequestId = playerState?.pendingRequestId ?? 0n;
+    const pendingRequestId = playerState?.pendingRequestId || observedPendingRequestIdRef.current || 0n;
     if (pendingRequestId === 0n) {
       return false;
     }
@@ -757,6 +1109,7 @@ export const useCrapsGame = (): UseCrapsGameResult => {
         return false;
       }
 
+
       appendResolvedRoll({
         id: `${String(resolvedLog.args?.requestId ?? pendingRequestId)}-${String(resolvedLog.blockNumber ?? Date.now())}`,
         requestId: BigInt(resolvedLog.args?.requestId ?? pendingRequestId),
@@ -767,8 +1120,21 @@ export const useCrapsGame = (): UseCrapsGameResult => {
       });
 
       setIsRolling(false);
+      setOptimisticRollPending(false);
+      setSuppressPendingSync(true);
+      setPlayerState((previous) =>
+        previous
+          ? {
+              ...previous,
+              phase: previous.point === 0 ? SESSION_PHASE.COME_OUT : SESSION_PHASE.POINT,
+              pendingRequestId: 0n,
+              reserved: 0n,
+              lastActivityTime: Math.floor(Date.now() / 1000),
+            }
+          : previous,
+      );
       await refresh();
-      await syncPlayerStateFromChain();
+      await syncPlayerStateAfterResolution();
       await syncRollHistoryFromChain();
       return true;
     } catch {
@@ -781,45 +1147,139 @@ export const useCrapsGame = (): UseCrapsGameResult => {
     playerState?.pendingRequestId,
     publicClient,
     refresh,
-    syncPlayerStateFromChain,
+    syncPlayerStateAfterResolution,
     syncRollHistoryFromChain,
   ]);
 
-  const runWrite = useCallback(
-    async (label: string, writer: () => Promise<Hex>) => {
-      setTxState({ busy: true, label });
-      try {
-        const hash = await writer();
-        setTxState({ busy: true, label, hash });
+  useEffect(() => {
+    if (!pendingTxMeta || !txReceiptQuery.isSuccess) {
+      return;
+    }
 
-        if (publicClient) {
-          await publicClient.waitForTransactionReceipt({ hash });
+    let cancelled = false;
+
+    const finalize = async () => {
+      try {
+        if (pendingTxMeta.label === 'Roll dice' || pendingTxMeta.label === 'Confirm & Roll') {
+          const requestId = syncPendingRequestFromReceipt(txReceiptQuery.data as typeof txReceiptQuery.data);
+          if (requestId !== null) {
+            void waitForResolvedRollByRequestId(
+              requestId,
+              (txReceiptQuery.data as { blockNumber?: bigint } | undefined)?.blockNumber,
+            );
+          }
         }
 
-        await refresh();
-        await syncPlayerStateFromChain();
-        setTxState({ busy: false, label, hash });
+        await pendingTxMeta.onConfirmed?.();
+        await refetchRelevantData(pendingTxMeta.refreshTargets);
+
+        if (pendingTxMeta.refreshTargets.includes('playerState')) {
+          await syncPlayerStateFromChain({
+            preservePending: pendingTxMeta.preservePendingOnSync,
+          });
+        }
+
+        if (!cancelled) {
+          setTxState({ busy: false, label: pendingTxMeta.label, hash: pendingTxMeta.hash });
+          pendingTxPromiseRef.current?.resolve();
+          pendingTxPromiseRef.current = null;
+          setPendingTxMeta(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setTxState({ busy: false, label: pendingTxMeta.label, error: mapContractError(error) });
+          pendingTxPromiseRef.current?.reject(error);
+          pendingTxPromiseRef.current = null;
+          setPendingTxMeta(null);
+        }
+      }
+    };
+
+    void finalize();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    pendingTxMeta,
+    refetchRelevantData,
+    syncPendingRequestFromReceipt,
+    syncPlayerStateFromChain,
+    txReceiptQuery.data,
+    txReceiptQuery.isSuccess,
+    waitForResolvedRollByRequestId,
+  ]);
+
+  useEffect(() => {
+    if (!pendingTxMeta || !txReceiptQuery.isError) {
+      return;
+    }
+
+    const error = txReceiptQuery.error;
+    setTxState({ busy: false, label: pendingTxMeta.label, error: mapContractError(error) });
+    pendingTxPromiseRef.current?.reject(error);
+    pendingTxPromiseRef.current = null;
+    setPendingTxMeta(null);
+  }, [pendingTxMeta, txReceiptQuery.error, txReceiptQuery.isError]);
+
+  const runWrite = useCallback(
+    async (
+      label: string,
+      writer: () => Promise<Hex>,
+      options: {
+        refreshTargets?: RefreshTarget[];
+        preservePendingOnSync?: boolean;
+        onConfirmed?: () => void | Promise<void>;
+      } = {},
+    ) => {
+      setTxState({ busy: true, label, error: undefined });
+      try {
+        const hash = await writer();
+        setTxState({ busy: true, label, hash, error: undefined });
+
+        await new Promise<void>((resolve, reject) => {
+          pendingTxPromiseRef.current = { resolve, reject };
+          setPendingTxMeta({
+            hash,
+            label,
+            refreshTargets: options.refreshTargets ?? ['playerState', 'walletBalance', 'allowance'],
+            preservePendingOnSync: options.preservePendingOnSync,
+            onConfirmed: options.onConfirmed,
+          });
+        });
       } catch (error) {
         setTxState({ busy: false, label, error: mapContractError(error) });
         throw error;
       }
     },
-    [publicClient, refresh, syncPlayerStateFromChain],
+    [],
   );
 
   const writeGame = useCallback(
-    async (label: string, functionName: string, args: readonly unknown[] = []) => {
+    async (
+      label: string,
+      functionName: string,
+      args: readonly unknown[] = [],
+      options: {
+        refreshTargets?: RefreshTarget[];
+        preservePendingOnSync?: boolean;
+        onConfirmed?: () => void | Promise<void>;
+      } = {},
+    ) => {
       if (!contractAddress) {
         throw new Error('Missing game contract configuration.');
       }
 
-      await runWrite(label, () =>
-        writeContractAsync({
-          address: contractAddress,
-          abi: crapsGameAbi,
-          functionName: functionName as never,
-          args: args as never,
-        }),
+      await runWrite(
+        label,
+        () =>
+          writeContractAsync({
+            address: contractAddress,
+            abi: crapsGameAbi,
+            functionName: functionName as never,
+            args: args as never,
+          }),
+        options,
       );
     },
     [contractAddress, runWrite, writeContractAsync],
@@ -830,32 +1290,86 @@ export const useCrapsGame = (): UseCrapsGameResult => {
       throw new Error('Missing token or game contract configuration.');
     }
 
-    await runWrite('Approve token', () =>
-      writeContractAsync({
-        address: tokenAddress,
-        abi: erc20Abi,
-        functionName: 'approve',
-        args: [contractAddress, maxUint256],
-      }),
+    await runWrite(
+      'Approve token',
+      () =>
+        writeContractAsync({
+          address: tokenAddress,
+          abi: erc20Abi,
+          functionName: 'approve',
+          args: [contractAddress, maxUint256],
+        }),
+      { refreshTargets: ['allowance'] },
     );
   }, [contractAddress, runWrite, tokenAddress, writeContractAsync]);
 
+  const requestFaucet = useCallback(
+    async (amount: bigint) => {
+      if (!canRequestFaucet || !address || !tokenAddress) {
+        throw new Error('srUSDC faucet is only available on BASE Sepolia for the connected wallet.');
+      }
+
+      if (amount <= 0n) {
+        throw new Error('Enter a valid faucet amount.');
+      }
+
+      if (amount > network.faucetMaxRequestAmount) {
+        throw new Error('Faucet requests are capped at 1000 srUSDC per request.');
+      }
+
+      await runWrite(
+        'Request faucet',
+        () =>
+          writeContractAsync({
+            address: tokenAddress,
+            abi: srUsdcAbi,
+            functionName: 'mint',
+            args: [address, amount],
+          }),
+        { refreshTargets: ['walletBalance'] },
+      );
+    },
+    [
+      address,
+      canRequestFaucet,
+      network.faucetMaxRequestAmount,
+      runWrite,
+      tokenAddress,
+      walletBalanceQuery,
+      writeContractAsync,
+    ],
+  );
+
   const deposit = useCallback(
-    (amount: bigint) => writeGame('Deposit', 'deposit', [amount]),
+    (amount: bigint) =>
+      writeGame('Deposit', 'deposit', [amount], {
+        refreshTargets: ['playerState', 'walletBalance', 'allowance'],
+      }),
     [writeGame],
   );
 
-  const withdraw = useCallback((amount: bigint) => writeGame('Withdraw', 'withdraw', [amount]), [writeGame]);
+  const withdraw = useCallback(
+    (amount: bigint) =>
+      writeGame('Withdraw', 'withdraw', [amount], {
+        refreshTargets: ['playerState', 'walletBalance'],
+      }),
+    [writeGame],
+  );
 
   const executeTurnActions = useCallback(
     async (label: string, actions: TurnAction[], rollAfter: boolean) => {
-      await writeGame(label, 'executeTurn', [actions.map(serializeTurnAction), rollAfter]);
+      await writeGame(label, 'executeTurn', [actions.map(serializeTurnAction), rollAfter], {
+        refreshTargets: rollAfter ? [] : ['playerState'],
+      });
     },
     [writeGame],
   );
 
   const closeSession = useCallback(async () => {
-    await writeGame('Close session', 'closeSession');
+    await writeGame('Close session', 'closeSession', [], {
+      refreshTargets: ['playerState', 'walletBalance'],
+    });
+    setOptimisticRollPending(false);
     setPendingRollActions([]);
     setPlayerState((previous) => ({
       ...(previous ?? EMPTY_PLAYER_STATE),
@@ -868,10 +1382,11 @@ export const useCrapsGame = (): UseCrapsGameResult => {
     }));
   }, [writeGame]);
   const rollDice = useCallback(async () => {
-    setIsRolling(true);
     try {
       const queuedActions = turnModeEnabled ? queuedTurnActions : [];
       setPendingRollActions(queuedActions);
+      setSuppressPendingSync(false);
+      observedPendingRequestIdRef.current = null;
 
       if (queuedActions.length > 0) {
         await executeTurnActions('Confirm & Roll', queuedActions, true);
@@ -880,28 +1395,36 @@ export const useCrapsGame = (): UseCrapsGameResult => {
         await executeTurnActions('Roll dice', [], true);
       }
 
+      setIsRolling(true);
+      setOptimisticRollPending(true);
       setPlayerState((previous) =>
         previous
           ? {
               ...previous,
               phase: SESSION_PHASE.ROLL_PENDING,
+              pendingRequestId: previous.pendingRequestId,
               lastActivityTime: Math.floor(Date.now() / 1000),
             }
           : previous,
       );
+      void syncPendingRollRequestFromChain();
     } catch (error) {
       setIsRolling(false);
+      setOptimisticRollPending(false);
       setPendingRollActions([]);
       throw error;
     }
-  }, [executeTurnActions, queuedTurnActions, turnModeEnabled]);
-  const selfExclude = useCallback(() => writeGame('Self-exclude', 'selfExclude'), [writeGame]);
+  }, [executeTurnActions, queuedTurnActions, syncPendingRollRequestFromChain, turnModeEnabled]);
+  const selfExclude = useCallback(
+    () => writeGame('Self-exclude', 'selfExclude', [], { refreshTargets: ['playerState'] }),
+    [writeGame],
+  );
   const requestSelfReinstatement = useCallback(
-    () => writeGame('Request reinstatement', 'requestSelfReinstatement'),
+    () => writeGame('Request reinstatement', 'requestSelfReinstatement', [], { refreshTargets: ['playerState'] }),
     [writeGame],
   );
   const completeSelfReinstatement = useCallback(
-    () => writeGame('Complete reinstatement', 'completeSelfReinstatement'),
+    () => writeGame('Complete reinstatement', 'completeSelfReinstatement', [], { refreshTargets: ['playerState'] }),
     [writeGame],
   );
 
@@ -1253,94 +1776,113 @@ export const useCrapsGame = (): UseCrapsGameResult => {
     [executeTurnActions, queueTurnAction, turnModeEnabled],
   );
 
-  useEffect(() => {
-    if (!publicClient || !contractAddress || !address) {
-      return;
-    }
+  useWatchContractEvent({
+    address: contractAddress,
+    abi: crapsGameAbi,
+    enabled: Boolean(publicClient && contractAddress && address),
+    poll: true,
+    pollingInterval: 4_000,
+    onLogs: (logs) => {
+      let shouldRefresh = false;
+      let forceClearPendingSync = false;
 
-    const unwatch = publicClient.watchContractEvent({
-      address: contractAddress,
-      abi: crapsGameAbi,
-      poll: true,
-      pollingInterval: 4_000,
-      onLogs: (logs) => {
-        let shouldRefresh = false;
-
-        logs.forEach((log: any) => {
-          const player = log.args?.player as Address | undefined;
-          if (!player || player.toLowerCase() !== address.toLowerCase()) {
-            return;
-          }
-
-          shouldRefresh = true;
-
-          if (log.eventName === 'SessionOpened') {
-            setPlayerState((previous) => ({
-              ...(previous ?? EMPTY_PLAYER_STATE),
-              phase: SESSION_PHASE.COME_OUT,
-              point: 0,
-              pendingRequestId: 0n,
-              lastActivityTime: Math.floor(Date.now() / 1000),
-            }));
-          }
-
-          if (log.eventName === 'SessionClosed' || log.eventName === 'SessionExpired') {
-            setQueuedTurnActions([]);
-            setPendingRollActions([]);
-            setPlayerState((previous) => ({
-              ...(previous ?? EMPTY_PLAYER_STATE),
-              phase: SESSION_PHASE.INACTIVE,
-              point: 0,
-              pendingRequestId: 0n,
-              inPlay: 0n,
-              reserved: 0n,
-              bets: EMPTY_BETS,
-            }));
-          }
-
-          if (log.eventName === 'RollRequested') {
-            setIsRolling(true);
-            setPlayerState((previous) =>
-              previous
-                ? {
-                    ...previous,
-                    phase: SESSION_PHASE.ROLL_PENDING,
-                    pendingRequestId: BigInt(log.args?.requestId ?? previous.pendingRequestId ?? 0),
-                    lastActivityTime: Math.floor(Date.now() / 1000),
-                  }
-                : previous,
-            );
-          }
-
-          if (log.eventName === 'RollResolved') {
-            setPendingRollActions([]);
-            appendResolvedRoll({
-              id: `${String(log.args?.requestId ?? 0)}-${String(log.blockNumber ?? Date.now())}`,
-              requestId: BigInt(log.args?.requestId ?? 0),
-              die1: Number(log.args?.die1 ?? 0),
-              die2: Number(log.args?.die2 ?? 0),
-              payout: BigInt(log.args?.payout ?? 0),
-              at: Date.now(),
-            });
-            setIsRolling(false);
-            void syncPlayerStateFromChain();
-          }
-
-          if (log.eventName === 'SessionExpired') {
-            setIsRolling(false);
-          }
-        });
-
-        if (shouldRefresh) {
-          void refresh();
-          void syncPlayerStateFromChain();
-          void syncRollHistoryFromChain();
+      logs.forEach((log: any) => {
+        const player = log.args?.player as Address | undefined;
+        if (!player || !address || player.toLowerCase() !== address.toLowerCase()) {
+          return;
         }
-      },
-    });
 
-    return () => unwatch();
-  }, [address, appendResolvedRoll, contractAddress, publicClient, refresh, syncPlayerStateFromChain, syncRollHistoryFromChain]);
+        shouldRefresh = true;
+
+        if (log.eventName === 'SessionOpened') {
+          setPlayerState((previous) => ({
+            ...(previous ?? EMPTY_PLAYER_STATE),
+            phase: SESSION_PHASE.COME_OUT,
+            point: 0,
+            pendingRequestId: 0n,
+            lastActivityTime: Math.floor(Date.now() / 1000),
+          }));
+        }
+
+        if (log.eventName === 'SessionClosed' || log.eventName === 'SessionExpired') {
+          forceClearPendingSync = true;
+          setQueuedTurnActions([]);
+          setPendingRollActions([]);
+          setPlayerState((previous) => ({
+            ...(previous ?? EMPTY_PLAYER_STATE),
+            phase: SESSION_PHASE.INACTIVE,
+            point: 0,
+            pendingRequestId: 0n,
+            inPlay: 0n,
+            reserved: 0n,
+            bets: EMPTY_BETS,
+          }));
+        }
+
+        if (log.eventName === 'RollRequested') {
+          setIsRolling(true);
+          setSuppressPendingSync(false);
+          observedPendingRequestIdRef.current = BigInt(log.args?.requestId ?? 0);
+          setPlayerState((previous) =>
+            previous
+              ? {
+                  ...previous,
+                  phase: SESSION_PHASE.ROLL_PENDING,
+                  pendingRequestId: BigInt(log.args?.requestId ?? previous.pendingRequestId ?? 0),
+                  lastActivityTime: Math.floor(Date.now() / 1000),
+                }
+              : previous,
+          );
+        }
+
+        if (log.eventName === 'RollResolved') {
+          forceClearPendingSync = true;
+          setPendingRollActions([]);
+          setOptimisticRollPending(false);
+          setSuppressPendingSync(true);
+          setPlayerState((previous) =>
+            previous
+              ? {
+                  ...previous,
+                  phase: previous.point === 0 ? SESSION_PHASE.COME_OUT : SESSION_PHASE.POINT,
+                  pendingRequestId: 0n,
+                  reserved: 0n,
+                  lastActivityTime: Math.floor(Date.now() / 1000),
+                }
+              : previous,
+          );
+          appendResolvedRoll({
+            id: `${String(log.args?.requestId ?? 0)}-${String(log.blockNumber ?? Date.now())}`,
+            requestId: BigInt(log.args?.requestId ?? 0),
+            die1: Number(log.args?.die1 ?? 0),
+            die2: Number(log.args?.die2 ?? 0),
+            payout: BigInt(log.args?.payout ?? 0),
+            at: Date.now(),
+          });
+          setIsRolling(false);
+          observedPendingRequestIdRef.current = null;
+          void syncPlayerStateAfterResolution();
+        }
+
+        if (log.eventName === 'SessionExpired') {
+          setIsRolling(false);
+          setOptimisticRollPending(false);
+          setSuppressPendingSync(false);
+          observedPendingRequestIdRef.current = null;
+        }
+      });
+
+      if (shouldRefresh) {
+        void refresh();
+        if (forceClearPendingSync) {
+          void syncPlayerStateAfterResolution();
+        } else {
+          void syncPlayerStateFromChain({ preservePending: true });
+        }
+        void syncRollHistoryFromChain();
+      }
+    },
+  });
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -1380,7 +1922,26 @@ export const useCrapsGame = (): UseCrapsGameResult => {
       }
 
       await refresh();
-      await syncPlayerStateFromChain();
+      const latestState = await readPlayerStateFromChain();
+
+      if (cancelled || !latestState) {
+        return;
+      }
+
+
+      if (latestState.phase !== SESSION_PHASE.ROLL_PENDING) {
+        if (observedPendingRequestIdRef.current !== null) {
+        } else {
+          setIsRolling(false);
+          setOptimisticRollPending(false);
+          setPendingRollActions([]);
+          applyPlayerStateSnapshot(latestState, { preservePending: false });
+          await syncRollHistoryAfterSettlement();
+          return;
+        }
+      } else {
+        applyPlayerStateSnapshot(latestState, { preservePending: true });
+      }
 
       if (cancelled) {
         return;
@@ -1400,13 +1961,15 @@ export const useCrapsGame = (): UseCrapsGameResult => {
     };
   }, [
     address,
+    applyPlayerStateSnapshot,
     contractAddress,
     isRolling,
     playerState?.phase,
     publicClient,
+    readPlayerStateFromChain,
     refresh,
-    syncPlayerStateFromChain,
     syncResolvedRollForPendingRequest,
+    syncRollHistoryAfterSettlement,
   ]);
 
   useEffect(() => {
@@ -1414,18 +1977,20 @@ export const useCrapsGame = (): UseCrapsGameResult => {
       return;
     }
 
-    if (playerState.phase === SESSION_PHASE.INACTIVE) {
+
+    if (playerState.phase === SESSION_PHASE.INACTIVE && !optimisticRollPending) {
       setRollHistory([]);
       setLastResolvedRoll(null);
       setIsRolling(false);
+      setSuppressPendingSync(false);
       setPendingRollActions([]);
     }
 
-    if (playerState.phase !== SESSION_PHASE.ROLL_PENDING) {
+    if (playerState.phase !== SESSION_PHASE.ROLL_PENDING && !optimisticRollPending) {
       setIsRolling(false);
       setPendingRollActions([]);
     }
-  }, [playerState]);
+  }, [optimisticRollPending, playerState]);
 
   const switchToBaseSepolia = useCallback(async () => {
     await switchChainAsync({ chainId: DEFAULT_CHAIN_ID });
@@ -1445,6 +2010,8 @@ export const useCrapsGame = (): UseCrapsGameResult => {
     tokenDecimals: Number(decimalsQuery.data ?? 6),
     walletTokenBalance: (walletBalanceQuery.data as bigint | undefined) ?? 0n,
     allowance: (allowanceQuery.data as bigint | undefined) ?? 0n,
+    faucetMaxRequestAmount: network.faucetMaxRequestAmount,
+    canRequestFaucet,
     playerState: displayPlayerState,
     rollHistory,
     lastResolvedRoll,
@@ -1464,6 +2031,7 @@ export const useCrapsGame = (): UseCrapsGameResult => {
     deposit,
     withdraw,
     approveMax,
+    requestFaucet,
     closeSession,
     placeBet,
     placeIndexedBet,
