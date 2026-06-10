@@ -17,10 +17,18 @@ body,
 
 body {
   overflow-x: hidden;
+  overflow-wrap: anywhere;
   background:
     radial-gradient(circle at top, rgba(54, 201, 134, 0.16), transparent 32%),
     linear-gradient(180deg, #07110a 0%, #0b1910 100%);
   color: #eef7f1;
+}
+
+.machine-room {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(54, 201, 134, 0.16), transparent 28rem),
+    radial-gradient(circle at 88% 12%, rgba(246, 196, 83, 0.1), transparent 24rem),
+    linear-gradient(180deg, #07110a 0%, #09150d 100%);
 }
 
 * {
@@ -234,7 +242,7 @@ input {
 .number-zone--disabled,
 .line-zone--disabled {
   border-style: dashed;
-  filter: saturate(0.78);
+  box-shadow: inset 0 0 0 1px rgba(246, 196, 83, 0.08);
 }
 
 .table-zone--disabled::before,
@@ -307,6 +315,94 @@ input {
 
 .number-zone__token--rose {
   background: radial-gradient(circle at 30% 30%, rgba(255, 195, 205, 0.52), rgba(156, 35, 61, 0.92));
+}
+
+.number-zone--working {
+  border-color: rgba(54, 201, 134, 0.5);
+}
+
+.number-zone--off {
+  border-color: rgba(148, 163, 184, 0.36);
+}
+
+.zone-hit-button,
+.number-hit-button {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: 1.15rem;
+  background: rgba(255, 255, 255, 0.045);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+}
+
+.zone-hit-button:not(:disabled):hover,
+.number-hit-button:not(:disabled):hover {
+  transform: translateY(-1px);
+  background: rgba(54, 201, 134, 0.11);
+  box-shadow: inset 0 0 0 1px rgba(54, 201, 134, 0.18);
+}
+
+.zone-hit-button:disabled,
+.number-hit-button:disabled {
+  cursor: not-allowed;
+  background: rgba(15, 23, 42, 0.18);
+}
+
+.zone-hit-button {
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.9rem;
+}
+
+.zone-hit-button--line {
+  height: 100%;
+}
+
+.zone-hit-button__copy,
+.zone-hit-button__amount,
+.number-hit-button__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow-wrap: anywhere;
+}
+
+.zone-hit-button__amount {
+  align-items: flex-end;
+  justify-content: center;
+  color: #d9fbe8;
+  font-weight: 900;
+  line-height: 1.1;
+  text-align: right;
+}
+
+.number-hit-button {
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.75rem;
+}
+
+.number-hit-button__copy {
+  gap: 0.18rem;
+}
+
+.lock-chip {
+  display: inline-flex;
+  max-width: 100%;
+  border: 1px dashed rgba(246, 196, 83, 0.35);
+  border-radius: 999px;
+  background: rgba(246, 196, 83, 0.08);
+  color: #fde68a;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.15;
+  padding: 0.28rem 0.55rem;
+  overflow-wrap: anywhere;
 }
 
 .slot-track {

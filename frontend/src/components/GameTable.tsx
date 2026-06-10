@@ -821,8 +821,8 @@ const SlotTrack = ({
   actionLocked?: boolean;
 }) => (
   <div className={`slot-track slot-track--${tone}`}>
-    <div className="craps-band__header">
-      <div>
+    <div className="craps-band__header min-w-0">
+      <div className="min-w-0">
         <p className="text-[0.7rem] uppercase tracking-[0.28em] text-slate-400">Travel lane</p>
         <h3 className="mt-1 text-base font-semibold text-white">{title}</h3>
       </div>
@@ -845,8 +845,8 @@ const SlotTrack = ({
             key={`${title}-${index}`}
             className={`slot-card ${slot.amount > 0n ? 'slot-card--active' : ''} ${isFirstEmpty ? 'slot-card--next' : ''}`}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div>
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <div className="min-w-0">
                 <p className="text-sm font-semibold text-white">Seat {index + 1}</p>
                 <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">
                   {isEmpty ? 'Empty' : slot.point === 0 ? 'Traveling' : `Point ${slot.point}`}
@@ -856,13 +856,13 @@ const SlotTrack = ({
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                <p className="text-[0.68rem] uppercase tracking-[0.18em] text-slate-400">Base</p>
-                <p className="mt-1 font-semibold text-white">{formatUsd(slot.amount)}</p>
+              <div className="min-w-0 rounded-2xl border border-white/10 bg-black/20 p-3">
+                <p className="truncate text-[0.68rem] uppercase tracking-[0.18em] text-slate-400">Base</p>
+                <p className="mt-1 break-words font-semibold text-white">{formatUsd(slot.amount)}</p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                <p className="text-[0.68rem] uppercase tracking-[0.18em] text-slate-400">Odds</p>
-                <p className="mt-1 font-semibold text-white">{formatUsd(slot.oddsAmount)}</p>
+              <div className="min-w-0 rounded-2xl border border-white/10 bg-black/20 p-3">
+                <p className="truncate text-[0.68rem] uppercase tracking-[0.18em] text-slate-400">Odds</p>
+                <p className="mt-1 break-words font-semibold text-white">{formatUsd(slot.oddsAmount)}</p>
               </div>
             </div>
 
