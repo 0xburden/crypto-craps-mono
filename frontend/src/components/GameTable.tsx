@@ -34,6 +34,28 @@ interface TableSlot {
   point: number;
 }
 
+interface SelectedBetAction {
+  key: string;
+  title: string;
+  subtitle: string;
+  amount: bigint;
+  secondaryLabel?: string;
+  secondaryAmount?: bigint;
+  status: string;
+  rule: string;
+  disabledReason: string | null;
+  placeLabel?: string;
+  onPlace?: () => void;
+  onOdds?: () => void;
+  oddsLabel?: string;
+  oddsDisabledReason?: string | null;
+  onRemove?: () => void;
+  removeLabel?: string;
+  onRemoveOdds?: () => void;
+  onToggleWorking?: () => void;
+  toggleLabel?: string;
+}
+
 const PROP_ORDER = [
   BET_TYPES.CRAPS_2,
   BET_TYPES.CRAPS_3,
@@ -46,6 +68,7 @@ const PROP_ORDER = [
 
 export const GameTable = ({ game }: GameTableProps) => {
   const [modal, setModal] = useState<ModalState | null>(null);
+  const [selectedBetKey, setSelectedBetKey] = useState('pass-line');
   const state = game.playerState;
   const bets = state?.bets;
   const excluded = isExcluded(state);
@@ -79,9 +102,8 @@ export const GameTable = ({ game }: GameTableProps) => {
   const canRoll =
     game.isConnected &&
     state !== null &&
-    state.phase !== SESSION_PHASE.INACTIVE &&
     state.phase !== SESSION_PHASE.ROLL_PENDING &&
-    state.inPlay > 0n &&
+    (state.inPlay > 0n || hasQueuedTurn) &&
     !excluded &&
     !state.paused;
   const rollButtonLabel = hasQueuedTurn ? 'Confirm & Roll' : 'Roll dice';
@@ -134,6 +156,152 @@ export const GameTable = ({ game }: GameTableProps) => {
     await game.placeBet(modal.betType, amount);
   };
 
+  const lineActions: SelectedBetAction[] = [
+    {
+      key: 'dont-pass',
+      title: "Don't Pass Bar",
+      subtitle: 'Line bet',
+      amount: dontPassAmount,
+      secondaryLabel: 'Odds',
+      secondaryAmount: dontPassOdds,
+      status: dontPassAmount > 0n ? 'LIVE' : 'OPEN',
+      rule: pointOn ? "Don't Pass is locked after come-out. Add lay odds here if active." : "Wins on come-out 2/3, loses on 7/11, pushes on 12.",
+      disabledReason: tableReason ?? (pointOn ? "Don't Pass can only be placed on come-out." : dontPassAmount > 0n ? "Don't Pass is already active." : null),
+      placeLabel: dontPassAmount > 0n ? 'View flat bet' : "Place Don't Pass",
+      onPlace: () => openSimpleModal("Don't Pass", BET_TYPES.DONT_PASS, dontPassAmount),
+      onOdds: () => openSimpleModal("Don't Pass Odds", BET_TYPES.DONT_PASS_ODDS, dontPassOdds, dontPassAmount, state?.point ?? 0, 'Lay odds after the point is established.'),
+      oddsLabel: 'Lay odds',
+      oddsDisabledReason: !pointOn ? 'Odds unlock after point ON.' : dontPassAmount === 0n ? "Place Don't Pass first." : null,
+      onRemove: dontPassAmount > 0n ? () => void game.removeBet(BET_TYPES.DONT_PASS) : undefined,
+      removeLabel: 'Take down',
+      onRemoveOdds: dontPassOdds > 0n ? () => void game.removeBet(BET_TYPES.DONT_PASS_ODDS) : undefined,
+    },
+    {
+      key: 'pass-line',
+      title: 'Pass Line',
+      subtitle: 'Line bet',
+      amount: passLineAmount,
+      secondaryLabel: 'Odds',
+      secondaryAmount: passLineOdds,
+      status: passLineAmount > 0n ? 'LIVE' : 'OPEN',
+      rule: pointOn ? 'Flat bet is locked. Add odds behind the active point.' : 'Wins on come-out 7/11. Loses on 2/3/12.',
+      disabledReason: tableReason ?? (pointOn ? 'Pass Line can only be placed on come-out.' : passLineAmount > 0n ? 'Pass Line is already active.' : null),
+      placeLabel: passLineAmount > 0n ? 'View flat bet' : 'Place Pass Line',
+      onPlace: () => openSimpleModal('Pass Line', BET_TYPES.PASS_LINE, passLineAmount),
+      onOdds: () => openSimpleModal('Pass Line Odds', BET_TYPES.PASS_LINE_ODDS, passLineOdds, passLineAmount, state?.point ?? 0, 'Odds can be added once a point is established.'),
+      oddsLabel: 'Add odds',
+      oddsDisabledReason: !pointOn ? 'Odds unlock after point ON.' : passLineAmount === 0n ? 'Place Pass Line first.' : null,
+      onRemoveOdds: passLineOdds > 0n ? () => void game.removeBet(BET_TYPES.PASS_LINE_ODDS) : undefined,
+    },
+  ];
+
+  const placeActions: SelectedBetAction[] = PLACE_BETS.map((definition) => {
+    const key = `place${definition.number}` as keyof typeof bets;
+    const placeBet = (bets?.[key] ?? { amount: 0n, working: false }) as { amount?: bigint; working?: boolean };
+    const amount = BigInt(placeBet.amount ?? 0);
+    const working = Boolean(placeBet.working);
+    return {
+      key: `place-${definition.number}`,
+      title: definition.label,
+      subtitle: 'Place number',
+      amount,
+      status: amount > 0n ? (working ? 'WORKING' : 'OFF') : 'NO CHIPS',
+      rule: 'Pays when the number repeats. In V3, OFF place bets stay parked through every roll.',
+      disabledReason: tableReason ?? (!pointOn ? 'Place bets require puck ON.' : null),
+      placeLabel: amount > 0n ? 'Add chips' : 'Place chips',
+      onPlace: () => openSimpleModal(definition.label, definition.betType, amount),
+      onRemove: amount > 0n ? () => void game.removeBet(definition.betType) : undefined,
+      removeLabel: 'Take down',
+      onToggleWorking: amount > 0n ? () => void game.setPlaceWorking(definition.number ?? 0, !working) : undefined,
+      toggleLabel: working ? 'Turn OFF' : 'Make working',
+    };
+  });
+
+  const layActions: SelectedBetAction[] = LAY_BETS.map((definition) => {
+    const key = `lay${definition.number}` as keyof typeof bets;
+    const layBet = (bets?.[key] ?? { amount: 0n, working: false }) as { amount?: bigint; working?: boolean };
+    const amount = BigInt(layBet.amount ?? 0);
+    const working = Boolean(layBet.working);
+    return {
+      key: `lay-${definition.number}`,
+      title: definition.label,
+      subtitle: 'Lay number',
+      amount,
+      status: amount > 0n ? (working ? 'WORKING' : 'OFF') : 'NO CHIPS',
+      rule: 'Wins on 7 before the number. In V3, OFF lay bets stay parked through every roll.',
+      disabledReason: tableReason ?? (!pointOn ? 'Lay bets require puck ON.' : null),
+      placeLabel: amount > 0n ? 'Add lay chips' : 'Lay chips',
+      onPlace: () => openSimpleModal(definition.label, definition.betType, amount),
+      onRemove: amount > 0n ? () => void game.removeBet(definition.betType) : undefined,
+      removeLabel: 'Take down',
+      onToggleWorking: amount > 0n ? () => void game.setLayWorking(definition.number ?? 0, !working) : undefined,
+      toggleLabel: working ? 'Turn OFF' : 'Make working',
+    };
+  });
+
+  const hardwayActions: SelectedBetAction[] = HARDWAY_BETS.map((definition) => {
+    const key = `hard${definition.number}` as keyof typeof bets;
+    const hardway = (bets?.[key] ?? { amount: 0n }) as { amount?: bigint };
+    const amount = BigInt(hardway.amount ?? 0);
+    return {
+      key: `hard-${definition.number}`,
+      title: definition.label,
+      subtitle: 'Hardway',
+      amount,
+      status: amount > 0n ? 'ALWAYS WORKING' : 'NO CHIPS',
+      rule: `${definition.label} wins on the matching pair. Easy ${definition.number} or any 7 loses.`,
+      disabledReason: tableReason,
+      placeLabel: amount > 0n ? 'Add chips' : 'Place hardway',
+      onPlace: () => openSimpleModal(definition.label, definition.betType, amount),
+      onRemove: amount > 0n ? () => void game.removeBet(definition.betType) : undefined,
+      removeLabel: 'Take down',
+    };
+  });
+
+  const fieldAmount = BigInt(bets?.oneRolls?.field ?? 0);
+  const fieldAction: SelectedBetAction = {
+    key: 'field',
+    title: 'Field',
+    subtitle: 'One-roll bet',
+    amount: fieldAmount,
+    status: fieldAmount > 0n ? 'LIVE THIS ROLL' : 'NO CHIPS',
+    rule: 'Wins on 2, 3, 4, 9, 10, 11, or 12. Clears after the next roll.',
+    disabledReason: tableReason,
+    placeLabel: fieldAmount > 0n ? 'Add chips' : 'Place field',
+    onPlace: () => openSimpleModal('Field', BET_TYPES.FIELD, fieldAmount),
+    onRemove: fieldAmount > 0n ? () => void game.removeBet(BET_TYPES.FIELD) : undefined,
+    removeLabel: 'Take down',
+  };
+
+  const propActions: SelectedBetAction[] = PROP_ORDER.flatMap((betType) => {
+    const definition = PROP_BETS.find((entry) => entry.betType === betType);
+    if (!definition) return [];
+    const amount = getPropAmount(definition.betType, bets);
+    const rule = definition.betType === BET_TYPES.HORN
+      ? 'Horn covers 2, 3, 11, and 12 for one roll.'
+      : definition.betType === BET_TYPES.ANY_CRAPS
+        ? 'Wins on 2, 3, or 12 for one roll.'
+        : definition.betType === BET_TYPES.ANY_7
+          ? 'Wins on any 7 for one roll.'
+          : 'Single-roll proposition bet. Clears after the next roll.';
+    return [{
+      key: `prop-${definition.betType}`,
+      title: definition.label,
+      subtitle: 'Center action',
+      amount,
+      status: amount > 0n ? 'LIVE THIS ROLL' : 'NO CHIPS',
+      rule,
+      disabledReason: tableReason,
+      placeLabel: amount > 0n ? 'Add chips' : 'Place prop',
+      onPlace: () => openSimpleModal(definition.label, definition.betType, amount),
+      onRemove: amount > 0n ? () => void game.removeBet(definition.betType) : undefined,
+      removeLabel: 'Take down',
+    }];
+  });
+
+  const selectedBet = [...lineActions, ...placeActions, ...layActions, fieldAction, ...hardwayActions, ...propActions]
+    .find((action) => action.key === selectedBetKey) ?? lineActions[1];
+
   return (
     <>
       <section className="felt-panel craps-table-shell bubble-machine rounded-[2rem] p-3 sm:p-4 lg:p-5">
@@ -171,54 +339,6 @@ export const GameTable = ({ game }: GameTableProps) => {
           <MiniStat label="Status" value={tableReason ?? (isTableBlocked ? 'Waiting' : 'Open')} />
         </div>
 
-        <div className="machine-console mt-3">
-          <div className="machine-console__screen">
-            <p className="text-[0.68rem] uppercase tracking-[0.24em] text-emerald-100/70">Available chips</p>
-            <p className="mt-1 text-3xl font-bold text-white">{formatUsd(state?.available)}</p>
-            <p className="mt-1 text-xs text-emerald-50/75">
-              {hasQueuedTurn
-                ? `${game.queuedTurnActions.length} queued chip move${game.queuedTurnActions.length === 1 ? '' : 's'} ready.`
-                : 'Tap a glowing felt zone to place chips.'}
-            </p>
-          </div>
-          <div className="machine-steps" aria-label="Bubble craps play steps">
-            {guideSteps.map((step, index) => (
-              <span key={step.label} className={`machine-step ${step.done ? 'machine-step--done' : ''}`}>
-                <span>{step.label}</span>
-                {index < guideSteps.length - 1 ? <span className="hidden text-slate-500 sm:inline">→</span> : null}
-              </span>
-            ))}
-          </div>
-          <div className="chip-rail" aria-label="Chip rail visual guide">
-            {['$1', '$5', '$25', '$100'].map((chip) => (
-              <span key={chip} className="chip-token">{chip}</span>
-            ))}
-          </div>
-          <div className="machine-console__actions">
-            <button
-              className="action-btn action-btn--secondary"
-              disabled={!hasQueuedTurn || actionLocked}
-              onClick={game.clearQueuedTurn}
-            >
-              Clear queued chips
-            </button>
-            <button
-              className="action-btn action-btn--primary action-btn--roll"
-              disabled={!canRoll || game.isRolling || actionLocked}
-              onClick={() => void game.rollDice()}
-            >
-              {game.isRolling || (actionLocked && (game.txLabel === 'Roll dice' || game.txLabel === 'Confirm & Roll')) ? (
-                <>
-                  <span className="action-btn__spinner" aria-hidden="true" />
-                  Rolling…
-                </>
-              ) : (
-                rollButtonLabel
-              )}
-            </button>
-          </div>
-        </div>
-
         {tableReason && (
           <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
             {tableReason}
@@ -251,7 +371,7 @@ export const GameTable = ({ game }: GameTableProps) => {
                 }
                 canAddOdds={Boolean(!tableReason && pointOn && dontPassAmount > 0n)}
                 actionLocked={actionLocked}
-                onAdd={() => openSimpleModal("Don't Pass", BET_TYPES.DONT_PASS, dontPassAmount)}
+                onAdd={() => setSelectedBetKey('dont-pass')}
                 onAddOdds={() =>
                   openSimpleModal(
                     "Don't Pass Odds",
@@ -267,6 +387,7 @@ export const GameTable = ({ game }: GameTableProps) => {
                   dontPassOdds > 0n ? () => void game.removeBet(BET_TYPES.DONT_PASS_ODDS) : undefined
                 }
                 accent="rose"
+                selected={selectedBet.key === 'dont-pass'}
               />
 
               <LineZone
@@ -284,7 +405,7 @@ export const GameTable = ({ game }: GameTableProps) => {
                 }
                 canAddOdds={Boolean(!tableReason && pointOn && passLineAmount > 0n)}
                 actionLocked={actionLocked}
-                onAdd={() => openSimpleModal('Pass Line', BET_TYPES.PASS_LINE, passLineAmount)}
+                onAdd={() => setSelectedBetKey('pass-line')}
                 onAddOdds={() =>
                   openSimpleModal(
                     'Pass Line Odds',
@@ -300,6 +421,7 @@ export const GameTable = ({ game }: GameTableProps) => {
                 }
                 accent="gold"
                 lockLabel="Flat bet locks once placed"
+                selected={selectedBet.key === 'pass-line'}
               />
               </div>
             </div>
@@ -314,7 +436,8 @@ export const GameTable = ({ game }: GameTableProps) => {
                 </div>
                 <span className="status-pill bg-white/5 text-slate-200">4 · 5 · 6 · 8 · 9 · 10</span>
               </div>
-              <div className="painted-banner mt-4">Tap a number to place chips</div>
+              <div className="painted-banner mt-4">PLACE BETS</div>
+              {!pointOn && !tableReason ? <p className="table-lockline">Place bets unlock after a point is ON.</p> : null}
               <div className="number-grid mt-3">
                 {PLACE_BETS.map((definition) => {
                   const key = `place${definition.number}` as keyof typeof bets;
@@ -332,8 +455,9 @@ export const GameTable = ({ game }: GameTableProps) => {
                       amount={amount}
                       working={working}
                       isPoint={point === definition.number}
+                      selected={selectedBet.key === `place-${definition.number}`}
                       disabledReason={tableReason ?? (!pointOn ? 'Place bets require puck ON.' : null)}
-                      onAdd={() => openSimpleModal(definition.label, definition.betType, amount)}
+                      onAdd={() => setSelectedBetKey(`place-${definition.number}`)}
                       onRemove={amount > 0n ? () => void game.removeBet(definition.betType) : undefined}
                       actionLocked={actionLocked}
                       onToggleWorking={
@@ -357,7 +481,8 @@ export const GameTable = ({ game }: GameTableProps) => {
                 </div>
                 <span className="status-pill bg-white/5 text-slate-200">4 · 5 · 6 · 8 · 9 · 10</span>
               </div>
-              <div className="painted-banner mt-4">Tap behind a number to lay</div>
+              <div className="painted-banner mt-4">LAY BETS</div>
+              {!pointOn && !tableReason ? <p className="table-lockline">Lay bets unlock after a point is ON.</p> : null}
               <div className="number-grid mt-3">
                 {LAY_BETS.map((definition) => {
                   const key = `lay${definition.number}` as keyof typeof bets;
@@ -376,8 +501,9 @@ export const GameTable = ({ game }: GameTableProps) => {
                       working={working}
                       isPoint={point === definition.number}
                       variant="lay"
+                      selected={selectedBet.key === `lay-${definition.number}`}
                       disabledReason={tableReason ?? (!pointOn ? 'Lay bets require puck ON.' : null)}
-                      onAdd={() => openSimpleModal(definition.label, definition.betType, amount)}
+                      onAdd={() => setSelectedBetKey(`lay-${definition.number}`)}
                       onRemove={amount > 0n ? () => void game.removeBet(definition.betType) : undefined}
                       actionLocked={actionLocked}
                       onToggleWorking={
@@ -454,9 +580,7 @@ export const GameTable = ({ game }: GameTableProps) => {
                 subtitle="2 · 3 · 4 · 9 · 10 · 11 · 12"
                 amount={BigInt(bets?.oneRolls?.field ?? 0)}
                 disabledReason={tableReason}
-                onAdd={() =>
-                  openSimpleModal('Field', BET_TYPES.FIELD, BigInt(bets?.oneRolls?.field ?? 0))
-                }
+                onAdd={() => setSelectedBetKey('field')}
                 onRemove={
                   BigInt(bets?.oneRolls?.field ?? 0) > 0n
                     ? () => void game.removeBet(BET_TYPES.FIELD)
@@ -465,6 +589,7 @@ export const GameTable = ({ game }: GameTableProps) => {
                 accent="emerald"
                 hero
                 actionLocked={actionLocked}
+                selected={selectedBet.key === 'field'}
               />
             </div>
 
@@ -488,13 +613,14 @@ export const GameTable = ({ game }: GameTableProps) => {
                     <TableZone
                       key={definition.betType}
                       title={definition.label}
-                      subtitle="Always working · easy roll or 7 loses"
+                      subtitle="Persistent"
                       amount={amount}
                       disabledReason={tableReason}
-                      onAdd={() => openSimpleModal(definition.label, definition.betType, amount)}
+                      onAdd={() => setSelectedBetKey(`prop-${definition.betType}`)}
                       onRemove={amount > 0n ? () => void game.removeBet(definition.betType) : undefined}
                       accent="blue"
                       actionLocked={actionLocked}
+                      selected={selectedBet.key === `hard-${definition.number}`}
                     />
                   );
                 })}
@@ -522,23 +648,18 @@ export const GameTable = ({ game }: GameTableProps) => {
                   return (
                     <TableZone
                       key={definition.betType}
-                      title={definition.label}
-                      subtitle={
-                        definition.betType === BET_TYPES.HORN
-                          ? '2 · 3 · 11 · 12'
-                          : definition.betType === BET_TYPES.ANY_CRAPS
-                            ? '2 · 3 · 12'
-                            : 'Single-roll'
-                      }
+                      title={getPropDisplay(definition.betType).title}
+                      subtitle={getPropDisplay(definition.betType).subtitle}
                       amount={amount}
                       disabledReason={tableReason}
-                      onAdd={() => openSimpleModal(definition.label, definition.betType, amount)}
+                      onAdd={() => setSelectedBetKey(`prop-${definition.betType}`)}
                       onRemove={
                         amount > 0n ? () => void game.removeBet(definition.betType) : undefined
                       }
                       accent={definition.betType === BET_TYPES.ANY_7 ? 'rose' : 'gold'}
                       actionLocked={actionLocked}
                       compact
+                      selected={selectedBet.key === `prop-${definition.betType}`}
                     />
                   );
                 })}
@@ -546,6 +667,21 @@ export const GameTable = ({ game }: GameTableProps) => {
             </div>
           </div>
         </div>
+
+        <MachineConsole
+          selectedBet={selectedBet}
+          available={state?.available ?? 0n}
+          queuedCount={game.queuedTurnActions.length}
+          guideSteps={guideSteps}
+          hasQueuedTurn={hasQueuedTurn}
+          actionLocked={actionLocked}
+          canRoll={canRoll}
+          isRolling={game.isRolling}
+          txLabel={game.txLabel}
+          rollButtonLabel={rollButtonLabel}
+          onClearQueue={game.clearQueuedTurn}
+          onRoll={() => void game.rollDice()}
+        />
       </section>
 
       {modal && (
@@ -587,6 +723,7 @@ const TableZone = ({
   compact = false,
   hero = false,
   actionLocked = false,
+  selected = false,
 }: {
   title: string;
   subtitle: string;
@@ -598,9 +735,8 @@ const TableZone = ({
   compact?: boolean;
   hero?: boolean;
   actionLocked?: boolean;
+  selected?: boolean;
 }) => {
-  const locked = Boolean(disabledReason) || actionLocked;
-
   return (
     <div
       className={[
@@ -609,32 +745,20 @@ const TableZone = ({
         amount > 0n ? 'table-zone--active' : '',
         disabledReason ? 'table-zone--disabled' : '',
         hero ? 'table-zone--hero' : '',
+        selected ? 'table-zone--selected' : '',
       ]
         .filter(Boolean)
         .join(' ')}
     >
-      <button className="zone-hit-button" disabled={locked} onClick={onAdd}>
+      <button className="zone-hit-button zone-hit-button--felt" disabled={actionLocked} onClick={onAdd} aria-label={`${title}. ${subtitle}`}>
         <span className="zone-hit-button__copy">
-          <span className={`font-semibold text-white ${compact ? 'text-sm' : 'text-base'}`}>{title}</span>
-          <span className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-300/85">{subtitle}</span>
+          <span className={`zone-title ${compact ? 'zone-title--compact' : ''}`}>{title}</span>
+          <span className="zone-state">{disabledReason ? 'LOCKED' : amount > 0n ? 'ACTIVE' : 'READY'}</span>
         </span>
         <span className="zone-hit-button__amount">
           <span className={hero ? 'text-2xl' : 'text-lg'}>{formatUsd(amount)}</span>
-          <span className="text-[0.68rem] uppercase tracking-[0.18em] text-emerald-100/70">
-            {amount > 0n ? 'Chips live' : 'Tap to place'}
-          </span>
         </span>
       </button>
-
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        {amount > 0n ? <span className="chip-badge">Live</span> : null}
-        {disabledReason ? <span className="lock-chip">Locked · {disabledReason}</span> : null}
-        {onRemove && amount > 0n && (
-          <button className="action-btn action-btn--danger" disabled={actionLocked} onClick={onRemove}>
-            Take down
-          </button>
-        )}
-      </div>
     </div>
   );
 };
@@ -650,6 +774,7 @@ const PlaceNumberZone = ({
   onToggleWorking,
   actionLocked = false,
   variant = 'place',
+  selected = false,
 }: {
   number: number;
   amount: bigint;
@@ -661,9 +786,8 @@ const PlaceNumberZone = ({
   onToggleWorking?: () => void;
   actionLocked?: boolean;
   variant?: 'place' | 'lay';
+  selected?: boolean;
 }) => {
-  const locked = Boolean(disabledReason) || actionLocked;
-
   return (
     <div
       className={[
@@ -672,41 +796,23 @@ const PlaceNumberZone = ({
         amount > 0n && working ? 'number-zone--working' : '',
         amount > 0n && !working ? 'number-zone--off' : '',
         disabledReason ? 'number-zone--disabled' : '',
+        selected ? 'number-zone--selected' : '',
       ]
         .filter(Boolean)
         .join(' ')}
     >
-      <button className="number-hit-button" disabled={locked} onClick={onAdd}>
+      <button className="number-hit-button number-hit-button--felt" disabled={actionLocked} onClick={onAdd}>
         <span className={`number-zone__token number-zone__token--${getNumberTone(number)}`}>{number}</span>
         <span className="number-hit-button__copy">
-          <span className="text-xs uppercase tracking-[0.18em] text-slate-300/85">
-            {variant === 'lay' ? 'Lay to win' : 'Place to win'}
-          </span>
-          <span className="text-xl font-semibold text-white">{formatUsd(amount)}</span>
-          <span className="text-[0.68rem] uppercase tracking-[0.18em] text-emerald-100/70">
-            {amount > 0n ? 'Tap to add chips' : 'Tap to place'}
+          <span className="zone-state">{variant === 'lay' ? 'LAY' : 'PLACE'}</span>
+          <span className="number-amount">{formatUsd(amount)}</span>
+          <span className={`chip-badge ${amount > 0n ? (working ? 'chip-badge--working' : 'chip-badge--off') : ''}`}>
+            {disabledReason ? 'LOCKED' : amount > 0n ? (working ? 'WORKING' : 'OFF') : 'READY'}
           </span>
         </span>
       </button>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        {isPoint ? <span className="puck-marker">PUCK ON</span> : null}
-        {amount > 0n ? <span className={`chip-badge ${working ? 'chip-badge--working' : 'chip-badge--off'}`}>{working ? 'WORKING' : 'OFF'}</span> : null}
-        {disabledReason ? <span className="lock-chip">Locked · {disabledReason}</span> : null}
-      </div>
-
-      <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-        {onToggleWorking && amount > 0n && (
-          <button className={`action-btn ${working ? 'action-btn--warning' : 'action-btn--primary'}`} disabled={actionLocked} onClick={onToggleWorking}>
-            {working ? 'Turn OFF' : 'Make working'}
-          </button>
-        )}
-        {onRemove && amount > 0n && (
-          <button className="action-btn action-btn--danger" disabled={actionLocked} onClick={onRemove}>
-            Take down
-          </button>
-        )}
-      </div>
+      {isPoint ? <span className="puck-marker mt-3">PUCK ON</span> : null}
     </div>
   );
 };
@@ -725,6 +831,7 @@ const LineZone = ({
   accent,
   lockLabel,
   actionLocked = false,
+  selected = false,
 }: {
   title: string;
   subtitle: string;
@@ -739,6 +846,7 @@ const LineZone = ({
   accent: 'gold' | 'rose';
   lockLabel?: string;
   actionLocked?: boolean;
+  selected?: boolean;
 }) => (
   <div
     className={[
@@ -746,52 +854,132 @@ const LineZone = ({
       `line-zone--${accent}`,
       amount > 0n || oddsAmount > 0n ? 'line-zone--active' : '',
       disabledReason ? 'line-zone--disabled' : '',
+      selected ? 'line-zone--selected' : '',
     ]
       .filter(Boolean)
       .join(' ')}
   >
     <div className="line-zone__content">
-      <button className="zone-hit-button zone-hit-button--line" disabled={Boolean(disabledReason) || actionLocked} onClick={onAdd}>
+      <button className="zone-hit-button zone-hit-button--line" disabled={actionLocked} onClick={onAdd}>
         <span className="zone-hit-button__copy">
-          <span className="text-sm font-semibold uppercase tracking-[0.24em] text-white/90">{title}</span>
-          <span className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-300/85">{subtitle}</span>
-          {lockLabel && <span className="mt-2 text-xs text-slate-300/80">{lockLabel}</span>}
+          <span className="zone-title">{title}</span>
+          <span className="zone-state">{disabledReason ? 'LOCKED' : amount > 0n ? 'LIVE' : 'READY'}</span>
         </span>
         <span className="zone-hit-button__amount">
           <span>{formatUsd(amount)}</span>
-          <span className="text-[0.68rem] uppercase tracking-[0.18em] text-emerald-100/70">Flat bet</span>
+          <span className="text-[0.68rem] uppercase tracking-[0.12em] text-emerald-100/70">Odds {formatUsd(oddsAmount)}</span>
         </span>
       </button>
-
-      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-1">
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Odds</p>
-          <p className="mt-1 text-lg font-semibold text-white">{formatUsd(oddsAmount)}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {amount > 0n ? <span className="chip-badge">Live</span> : null}
-          {disabledReason ? <span className="lock-chip">Locked · {disabledReason}</span> : null}
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2 lg:justify-end">
-        <button className="action-btn action-btn--secondary" disabled={!canAddOdds || actionLocked} onClick={onAddOdds}>
-          Add odds
-        </button>
-        {onRemove && amount > 0n && (
-          <button className="action-btn action-btn--danger" disabled={actionLocked} onClick={onRemove}>
-            Take down
-          </button>
-        )}
-        {onRemoveOdds && oddsAmount > 0n && (
-          <button className="action-btn action-btn--warning" disabled={actionLocked} onClick={onRemoveOdds}>
-            Take odds
-          </button>
-        )}
-      </div>
     </div>
   </div>
 );
+
+const MachineConsole = ({
+  selectedBet,
+  available,
+  queuedCount,
+  guideSteps,
+  hasQueuedTurn,
+  actionLocked,
+  canRoll,
+  isRolling,
+  txLabel,
+  rollButtonLabel,
+  onClearQueue,
+  onRoll,
+}: {
+  selectedBet: SelectedBetAction;
+  available: bigint;
+  queuedCount: number;
+  guideSteps: Array<{ label: string; done: boolean }>;
+  hasQueuedTurn: boolean;
+  actionLocked: boolean;
+  canRoll: boolean;
+  isRolling: boolean;
+  txLabel?: string;
+  rollButtonLabel: string;
+  onClearQueue: () => void;
+  onRoll: () => void;
+}) => {
+  const placeDisabled = Boolean(selectedBet.disabledReason) || actionLocked || !selectedBet.onPlace;
+  const oddsDisabled = Boolean(selectedBet.oddsDisabledReason) || actionLocked || !selectedBet.onOdds;
+  const rolling = isRolling || (actionLocked && (txLabel === 'Roll dice' || txLabel === 'Confirm & Roll'));
+
+  return (
+    <div className="machine-console machine-console--deck mt-4">
+      <div className="machine-console__screen machine-console__screen--selected">
+        <p className="text-[0.68rem] uppercase tracking-[0.18em] text-emerald-100/70">Selected bet</p>
+        <div className="mt-1 flex min-w-0 flex-wrap items-end gap-3">
+          <p className="min-w-0 truncate text-3xl font-bold text-white">{selectedBet.title}</p>
+          <span className="console-pill console-pill--hot">{selectedBet.status}</span>
+          <span className="console-pill">{formatUsd(selectedBet.amount)}</span>
+          {selectedBet.secondaryAmount !== undefined ? (
+            <span className="console-pill">{selectedBet.secondaryLabel}: {formatUsd(selectedBet.secondaryAmount)}</span>
+          ) : null}
+        </div>
+        <p className="mt-2 line-clamp-2 text-sm text-emerald-50/75">{selectedBet.rule}</p>
+        {selectedBet.disabledReason ? <p className="mt-2 text-xs font-bold text-amber-200">{selectedBet.disabledReason}</p> : null}
+        {selectedBet.oddsDisabledReason ? <p className="mt-1 text-xs text-slate-400">{selectedBet.oddsDisabledReason}</p> : null}
+      </div>
+
+      <div className="machine-steps" aria-label="Bubble craps play steps">
+        {guideSteps.map((step, index) => (
+          <span key={step.label} className={`machine-step ${step.done ? 'machine-step--done' : ''}`}>
+            <span>{step.label}</span>
+            {index < guideSteps.length - 1 ? <span className="hidden text-slate-500 sm:inline">→</span> : null}
+          </span>
+        ))}
+      </div>
+
+      <div className="chip-rail" aria-label="Chip rail visual guide">
+        <span className="console-pill">Available {formatUsd(available)}</span>
+        {['$1', '$5', '$25', '$100'].map((chip) => (
+          <span key={chip} className="chip-token">{chip}</span>
+        ))}
+        {queuedCount > 0 ? <span className="console-pill console-pill--hot">{queuedCount} queued</span> : null}
+      </div>
+
+      <div className="machine-console__actions">
+        <button className="action-btn action-btn--primary" disabled={placeDisabled} onClick={selectedBet.onPlace}>
+          {selectedBet.placeLabel ?? 'Place chips'}
+        </button>
+        {selectedBet.onOdds ? (
+          <button className="action-btn action-btn--secondary" disabled={oddsDisabled} onClick={selectedBet.onOdds}>
+            {selectedBet.oddsLabel ?? 'Odds'}
+          </button>
+        ) : null}
+        {selectedBet.onToggleWorking ? (
+          <button className="action-btn action-btn--warning" disabled={actionLocked} onClick={selectedBet.onToggleWorking}>
+            {selectedBet.toggleLabel ?? 'Toggle'}
+          </button>
+        ) : null}
+        {selectedBet.onRemove ? (
+          <button className="action-btn action-btn--danger" disabled={actionLocked} onClick={selectedBet.onRemove}>
+            {selectedBet.removeLabel ?? 'Take down'}
+          </button>
+        ) : null}
+        {selectedBet.onRemoveOdds ? (
+          <button className="action-btn action-btn--warning" disabled={actionLocked} onClick={selectedBet.onRemoveOdds}>
+            Take odds
+          </button>
+        ) : null}
+        <button className="action-btn action-btn--secondary" disabled={!hasQueuedTurn || actionLocked} onClick={onClearQueue}>
+          Clear queued
+        </button>
+        <button className="action-btn action-btn--primary action-btn--roll" disabled={!canRoll || isRolling || actionLocked} onClick={onRoll}>
+          {rolling ? (
+            <>
+              <span className="action-btn__spinner" aria-hidden="true" />
+              Rolling…
+            </>
+          ) : (
+            rollButtonLabel
+          )}
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const SlotTrack = ({
   title,
@@ -806,6 +994,7 @@ const SlotTrack = ({
   onRemoveOdds,
   showRemoveBase,
   actionLocked = false,
+  selected = false,
 }: {
   title: string;
   subtitle: string;
@@ -819,8 +1008,9 @@ const SlotTrack = ({
   onRemoveOdds?: (index: number) => void;
   showRemoveBase: boolean;
   actionLocked?: boolean;
+  selected?: boolean;
 }) => (
-  <div className={`slot-track slot-track--${tone}`}>
+  <div className={`slot-track slot-track--${tone} ${selected ? 'slot-track--selected' : ''}`}>
     <div className="craps-band__header min-w-0">
       <div className="min-w-0">
         <p className="text-[0.7rem] uppercase tracking-[0.28em] text-slate-400">Travel lane</p>
@@ -928,6 +1118,31 @@ const getNumberTone = (number: number) => {
 
   return 'blue';
 };
+
+const getPropDisplay = (betType: BetTypeId) => {
+  switch (betType) {
+    case BET_TYPES.CRAPS_2:
+      return { title: '2', subtitle: 'Craps' };
+    case BET_TYPES.CRAPS_3:
+      return { title: '3', subtitle: 'Craps' };
+    case BET_TYPES.ANY_CRAPS:
+      return { title: 'Any Craps', subtitle: '2 · 3 · 12' };
+    case BET_TYPES.HORN:
+      return { title: 'Horn', subtitle: '2 · 3 · 11 · 12' };
+    case BET_TYPES.YO:
+      return { title: 'Yo 11', subtitle: 'Single roll' };
+    case BET_TYPES.TWELVE:
+      return { title: '12', subtitle: 'Twelve' };
+    case BET_TYPES.ANY_7:
+      return { title: 'Any 7', subtitle: 'Single roll' };
+    default:
+      return { title: 'Prop', subtitle: 'Single roll' };
+  }
+};
+
+
+
+
 
 const getPropAmount = (betType: BetTypeId, bets: any) => {
   switch (betType) {
