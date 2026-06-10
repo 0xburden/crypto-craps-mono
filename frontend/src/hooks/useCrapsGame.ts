@@ -11,7 +11,7 @@ import {
   useWatchContractEvent,
   useWriteContract,
 } from 'wagmi';
-import { crapsGameV2Abi } from '../abi/crapsGameV2Abi';
+import { crapsGameV3Abi } from '../abi/crapsGameV3Abi';
 import { srUsdcAbi } from '../abi/srUsdcAbi';
 import { DEFAULT_CHAIN_ID, NETWORK_CONFIG } from '../config/contracts';
 import {
@@ -27,7 +27,7 @@ import {
 } from '../lib/craps';
 import { erc20Abi } from '../lib/erc20Abi';
 
-const crapsGameAbi = crapsGameV2Abi as Abi;
+const crapsGameAbi = crapsGameV3Abi as Abi;
 const rollRequestedEvent = parseAbiItem(
   'event RollRequested(address indexed player, uint256 indexed requestId, uint256 reservedAmount)'
 );
