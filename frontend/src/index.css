@@ -1138,6 +1138,23 @@ input {
   }
 }
 
+/* Keep the primary game in a terminal layout: HUD, full-width table, bottom console. */
+.machine-cabinet {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.machine-sidecar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  align-items: start;
+  max-height: none;
+  overflow: visible;
+}
+
+.machine-sidecar > * {
+  min-width: 0;
+}
+
 @media (orientation: landscape) and (max-width: 1180px) {
   .machine-cabinet {
     grid-template-columns: minmax(0, 1fr);
@@ -1150,10 +1167,7 @@ input {
   }
 
   .machine-sidecar {
-    display: grid;
     grid-template-columns: repeat(2, minmax(280px, 1fr));
-    max-height: none;
-    overflow: visible;
     padding-right: 0;
   }
 
