@@ -27,8 +27,9 @@ export const NETWORK_CONFIG = {
     gameAddress: parseOptionalAddress(
       runtimeValue('baseSepoliaGameAddressV3') ??
         import.meta.env.VITE_BASE_SEPOLIA_GAME_ADDRESS_V3 ??
-        runtimeValue('baseSepoliaGameAddress') ??
+        runtimeValue('baseSepoliaGameAddressV2') ??
         import.meta.env.VITE_BASE_SEPOLIA_GAME_ADDRESS_V2 ??
+        runtimeValue('baseSepoliaGameAddress') ??
         import.meta.env.VITE_BASE_SEPOLIA_GAME_ADDRESS ??
         '0xf031019A2A1DcEee8dAc3a7B9bf3066ced493292',
     ),
@@ -48,8 +49,9 @@ export const NETWORK_CONFIG = {
     gameAddress: parseOptionalAddress(
       runtimeValue('baseMainnetGameAddressV3') ??
         import.meta.env.VITE_BASE_MAINNET_GAME_ADDRESS_V3 ??
-        runtimeValue('baseMainnetGameAddress') ??
+        runtimeValue('baseMainnetGameAddressV2') ??
         import.meta.env.VITE_BASE_MAINNET_GAME_ADDRESS_V2 ??
+        runtimeValue('baseMainnetGameAddress') ??
         import.meta.env.VITE_BASE_MAINNET_GAME_ADDRESS,
     ),
     tokenAddress: parseOptionalAddress(
