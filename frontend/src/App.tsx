@@ -51,10 +51,10 @@ const App = () => {
       };
     }
 
-    if (game.needsMainnetDeployment) {
+    if (game.needsGameDeployment) {
       return {
         tone: 'amber',
-        message: 'BASE Mainnet support is configured, but the live game contract address is not set yet.',
+        message: `${game.networkLabel} V3 game contract address is not configured. Set the V3 address before playing.`,
       };
     }
 
@@ -94,12 +94,12 @@ const App = () => {
 
   return (
     <LandscapeGate>
-      <div className="min-h-screen bg-felt-950 text-white">
+      <div className="machine-room min-h-screen bg-felt-950 text-white">
         <HeaderBar game={game} sessionRemainingSeconds={sessionRemainingSeconds} />
 
-        <div className="mx-auto max-w-[1600px] px-4 py-4 lg:px-6">
+        <div className="mx-auto max-w-[1600px] px-3 py-3 sm:px-4 lg:px-6">
           <div
-            className={`rounded-2xl border px-4 py-3 text-sm ${
+            className={`machine-alert rounded-2xl border px-4 py-3 text-sm ${
               banner.tone === 'rose'
                 ? 'border-rose-400/20 bg-rose-500/10 text-rose-100'
                 : banner.tone === 'amber'
@@ -107,26 +107,26 @@ const App = () => {
                   : 'border-emerald-400/20 bg-emerald-500/10 text-emerald-100'
             }`}
           >
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <p>{banner.message}</p>
+            <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <p className="min-w-0 break-words leading-relaxed">{banner.message}</p>
               {banner.action}
             </div>
           </div>
         </div>
 
-        <div className="mx-auto max-w-[1600px] px-4 lg:px-6">
-          <div className="table-rail mb-4 rounded-2xl px-4 py-3 text-[0.72rem] uppercase tracking-[0.22em] text-slate-200/80">
-            Pass line · Don't Pass · Come · Don't Come · Place · Hardways · Props
+        <div className="mx-auto max-w-[1600px] px-3 sm:px-4 lg:px-6">
+          <div className="table-rail machine-rail mb-3 rounded-2xl px-4 py-3 text-[0.72rem] uppercase tracking-[0.18em] text-slate-200/80">
+            <span className="text-emerald-200">Machine mode</span> · Tap felt zones · OFF place/lay bets stay parked · Confirm & roll
           </div>
         </div>
 
-        <main className="mx-auto max-w-[1600px] px-4 pb-8 lg:px-6">
-          <div className="table-shell grid gap-5 rounded-[2.25rem] p-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(340px,0.92fr)]">
-            <div className="space-y-5">
+        <main className="mx-auto max-w-[1600px] px-3 pb-8 sm:px-4 lg:px-6">
+          <div className="table-shell machine-cabinet grid min-w-0 gap-4 rounded-[2.25rem] p-2 sm:p-3 xl:grid-cols-[minmax(0,1.82fr)_minmax(320px,0.76fr)]">
+            <div className="machine-table-area min-w-0 space-y-5">
               <GameTable game={game} />
             </div>
 
-            <aside className="space-y-5 xl:sticky xl:top-24 xl:self-start">
+            <aside className="machine-sidecar min-w-0 space-y-4 xl:sticky xl:top-24 xl:self-start">
               <SessionPanel game={game} sessionRemainingSeconds={sessionRemainingSeconds} />
               <RollHistoryPanel game={game} />
               <WalletPanel game={game} />

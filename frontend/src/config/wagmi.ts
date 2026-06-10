@@ -2,9 +2,9 @@ import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 import { http } from 'wagmi';
 import { base, baseSepolia } from 'wagmi/chains';
 import { NETWORK_CONFIG } from './contracts';
+import { runtimeValue } from './runtime';
 
-const walletConnectProjectId =
-  import.meta.env.VITE_WALLETCONNECT_PROJECT_ID ?? 'demo';
+const walletConnectProjectId = runtimeValue('walletConnectProjectId') ?? import.meta.env.VITE_WALLETCONNECT_PROJECT_ID ?? 'demo';
 
 export const wagmiConfig = getDefaultConfig({
   appName: 'Crypto Craps',

@@ -26,12 +26,12 @@ export const SessionPanel = ({ game, sessionRemainingSeconds }: SessionPanelProp
   const excluded = isExcluded(state);
   const pointOn = (state?.point ?? 0) !== 0;
   const actionLocked = game.isTxPending;
+  const hasQueuedTurn = game.queuedTurnActions.length > 0;
   const canClose =
     game.isConnected &&
     state !== null &&
     state.phase !== SESSION_PHASE.INACTIVE &&
     state.phase !== SESSION_PHASE.ROLL_PENDING;
-  const hasQueuedTurn = game.queuedTurnActions.length > 0;
   const canRoll =
     game.isConnected &&
     state !== null &&
@@ -43,13 +43,11 @@ export const SessionPanel = ({ game, sessionRemainingSeconds }: SessionPanelProp
   const rollButtonLabel = hasQueuedTurn ? 'Confirm & Roll' : 'Roll dice';
 
   return (
-    <section className="felt-panel rounded-3xl p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold text-white">Session</h2>
-          <p className="mt-1 text-sm text-slate-300">
-            Sessions open automatically on your first bet. Bet changes queue by default so you can confirm them with one roll transaction.
-          </p>
+    <section className="felt-panel machine-panel rounded-3xl p-4 sm:p-5">
+      <div className="machine-panel__titlebar">
+        <div className="min-w-0">
+          <p className="machine-kicker">Roll console</p>
+          <h2 className="truncate text-xl font-black uppercase tracking-[0.08em] text-white">Ready station</h2>
         </div>
         <span
           className={`status-pill ${pointOn ? 'border border-amber-300/35 bg-amber-400/15 text-amber-100 shadow-[0_0_24px_rgba(246,196,83,0.18)]' : 'bg-white/5 text-slate-100'}`}
@@ -58,47 +56,26 @@ export const SessionPanel = ({ game, sessionRemainingSeconds }: SessionPanelProp
         </span>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
         <PanelMetric label="Phase" value={getPhaseLabel(state?.phase)} />
-        <PanelMetric
-          label={pointOn ? 'Point is ON' : 'Point'}
-          value={state?.point ? state.point.toString() : '—'}
-          emphasis={pointOn}
-        />
-        <PanelMetric label="In play" value={formatUsd(state?.inPlay)} />
+        <PanelMetric label={pointOn ? 'Point is ON' : 'Point'} value={state?.point ? state.point.toString() : '—'} emphasis={pointOn} />
+        <PanelMetric label="On table" value={formatUsd(state?.inPlay)} />
         <PanelMetric label="Timer" value={formatCountdown(sessionRemainingSeconds)} />
       </div>
 
       {pointOn && (
-        <div className="mt-4 rounded-2xl border border-amber-300/30 bg-[radial-gradient(circle_at_top,rgba(246,196,83,0.24),rgba(246,196,83,0.08)_45%,rgba(0,0,0,0.08))] p-4 text-amber-50 shadow-[0_0_30px_rgba(246,196,83,0.12)]">
-          <p className="text-xs uppercase tracking-[0.24em] text-amber-100/80">Puck on</p>
-          <div className="mt-2 flex items-end justify-between gap-4">
-            <div>
-              <p className="text-4xl font-semibold leading-none">{state?.point}</p>
-              <p className="mt-2 text-sm text-amber-50/85">Point is established. Box action and odds are live.</p>
-            </div>
-            <span className="status-pill border border-amber-200/35 bg-black/15 text-amber-50">POINT {state?.point}</span>
+        <div className="point-display mt-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-amber-100/80">Point number</p>
+            <p className="mt-1 text-5xl font-black leading-none text-amber-50">{state?.point}</p>
           </div>
+          <span className="status-pill border border-amber-200/35 bg-black/20 text-amber-50">BOX ACTION LIVE</span>
         </div>
       )}
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
+      <div className="roll-console mt-4">
         <button
-          className="action-btn action-btn--secondary"
-          disabled={!canClose || actionLocked}
-          onClick={() => void game.closeSession()}
-        >
-          {actionLocked && game.txLabel === 'Close session' ? (
-            <>
-              <span className="action-btn__spinner" aria-hidden="true" />
-              Closing…
-            </>
-          ) : (
-            'Close session'
-          )}
-        </button>
-        <button
-          className="action-btn action-btn--primary"
+          className="roll-button"
           disabled={!canRoll || game.isRolling || actionLocked}
           onClick={() => void game.rollDice()}
         >
@@ -111,87 +88,71 @@ export const SessionPanel = ({ game, sessionRemainingSeconds }: SessionPanelProp
             rollButtonLabel
           )}
         </button>
-      </div>
-
-      <div className="mt-4">
-        <AccordionSection
-          title="Turn composer"
-          description="Collapsed by default. Review queued actions or temporarily disable batching."
-        >
-          <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4 text-sm text-emerald-100">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-emerald-100/80">Turn composer</p>
-                <p className="mt-1 text-sm text-emerald-50/90">
-                  Bet changes are batched by default. Queue actions, then use Confirm & Roll for one gameplay confirmation.
-                </p>
-              </div>
-              <button
-                className={`action-btn ${game.turnModeEnabled ? 'action-btn--warning' : 'action-btn--secondary'}`}
-                disabled={actionLocked}
-                onClick={() => void game.setTurnModeEnabled(!game.turnModeEnabled)}
-              >
-                {game.turnModeEnabled ? 'Batching: ON' : 'Batching: OFF'}
-              </button>
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                className="action-btn action-btn--secondary"
-                disabled={!hasQueuedTurn || actionLocked}
-                onClick={game.clearQueuedTurn}
-              >
-                Clear queued turn
-              </button>
-              {hasQueuedTurn && (
-                <span className="status-pill border border-emerald-200/30 bg-emerald-400/10 text-emerald-50">
-                  {game.queuedTurnActions.length} action{game.queuedTurnActions.length === 1 ? '' : 's'} queued
-                </span>
-              )}
-            </div>
-
-            {hasQueuedTurn ? (
-              <div className="mt-4 space-y-2 rounded-2xl border border-emerald-300/20 bg-black/15 p-3 text-sm text-emerald-50">
-                {game.queuedTurnActions.map((action, index) => (
-                  <div
-                    key={`${action.kind}-${action.betType}-${action.index}-${index}`}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2"
-                  >
-                    <span>{describeTurnAction(action)}</span>
-                    <span className="text-xs uppercase tracking-[0.2em] text-emerald-100/70">
-                      {index + 1}
-                    </span>
-                  </div>
-                ))}
-              </div>
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+          <button className="action-btn action-btn--secondary" disabled={!hasQueuedTurn || actionLocked} onClick={game.clearQueuedTurn}>
+            Clear queue
+          </button>
+          <button className="action-btn action-btn--secondary" disabled={actionLocked} onClick={() => void game.setTurnModeEnabled(!game.turnModeEnabled)}>
+            Queue {game.turnModeEnabled ? 'ON' : 'OFF'}
+          </button>
+          <button className="action-btn action-btn--warning sm:col-span-2 xl:col-span-1 2xl:col-span-2" disabled={!canClose || actionLocked} onClick={() => void game.closeSession()}>
+            {actionLocked && game.txLabel === 'Close session' ? (
+              <>
+                <span className="action-btn__spinner" aria-hidden="true" />
+                Closing…
+              </>
             ) : (
-              <p className="mt-3 text-sm text-emerald-50/80">No queued turn actions.</p>
+              'Color up / close'
             )}
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs uppercase tracking-[0.22em] text-emerald-100/75">Queued turn</span>
+          <span className="status-pill border border-emerald-200/30 bg-emerald-400/10 text-emerald-50">
+            {game.queuedTurnActions.length} action{game.queuedTurnActions.length === 1 ? '' : 's'}
+          </span>
+        </div>
+        {hasQueuedTurn ? (
+          <div className="mt-3 space-y-2">
+            {game.queuedTurnActions.slice(0, 3).map((action, index) => (
+              <div key={`${action.kind}-${action.betType}-${action.index}-${index}`} className="queue-row">
+                <span className="min-w-0 truncate">{describeTurnAction(action)}</span>
+                <span>{index + 1}</span>
+              </div>
+            ))}
+            {game.queuedTurnActions.length > 3 && <p className="text-xs text-emerald-50/75">+{game.queuedTurnActions.length - 3} more queued</p>}
           </div>
-        </AccordionSection>
+        ) : (
+          <p className="mt-2 text-emerald-50/80">Tap a felt zone to queue chips.</p>
+        )}
       </div>
 
-      <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-300">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-          <p className="text-slate-300">Pending request</p>
-          <p className="max-w-full break-all font-mono text-xs text-slate-200 sm:text-right">
-            {formatRequestId(state?.pendingRequestId)}
-          </p>
+      <AccordionSection title="Machine details" description="Request id, reserve, and full turn queue.">
+        <div className="space-y-3 text-sm text-slate-300">
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+              <p className="text-slate-300">Pending request</p>
+              <p className="max-w-full break-all font-mono text-xs text-slate-200 sm:text-right">
+                {formatRequestId(state?.pendingRequestId)}
+              </p>
+            </div>
+            <p className="mt-2">Reserved payout: {formatUsd(state?.reserved)}</p>
+          </div>
+          {hasQueuedTurn && (
+            <div className="space-y-2 rounded-2xl border border-emerald-300/20 bg-black/15 p-3 text-emerald-50">
+              {game.queuedTurnActions.map((action, index) => (
+                <div key={`${action.kind}-${action.betType}-${action.index}-detail-${index}`} className="queue-row">
+                  <span className="min-w-0 truncate">{describeTurnAction(action)}</span>
+                  <span>{index + 1}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-        <p className="mt-2">Reserved payout: {formatUsd(state?.reserved)}</p>
-        <p className="mt-1 text-slate-400">Roll requests are synchronized via the on-chain RollResolved event.</p>
-      </div>
-
-      {game.lastResolvedRoll && (
-        <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4 text-sm text-emerald-100">
-          <p className="font-semibold">Latest roll</p>
-          <p className="mt-1">
-            {game.lastResolvedRoll.die1} + {game.lastResolvedRoll.die2} ={' '}
-            {game.lastResolvedRoll.die1 + game.lastResolvedRoll.die2}
-          </p>
-          <p className="mt-1">Payout: {formatUsd(game.lastResolvedRoll.payout)}</p>
-        </div>
-      )}
+      </AccordionSection>
     </section>
   );
 };
@@ -205,14 +166,8 @@ const PanelMetric = ({
   value: string;
   emphasis?: boolean;
 }) => (
-  <div
-    className={`rounded-2xl border p-3 ${
-      emphasis
-        ? 'border-amber-300/30 bg-amber-400/10 shadow-[0_0_24px_rgba(246,196,83,0.10)]'
-        : 'border-white/10 bg-white/5'
-    }`}
-  >
-    <p className={`text-xs uppercase tracking-wide ${emphasis ? 'text-amber-100/80' : 'text-slate-400'}`}>{label}</p>
-    <p className={`mt-1 font-semibold ${emphasis ? 'text-amber-50' : 'text-white'}`}>{value}</p>
+  <div className={`machine-metric ${emphasis ? 'machine-metric--hot' : ''}`}>
+    <p>{label}</p>
+    <strong>{value}</strong>
   </div>
 );

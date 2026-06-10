@@ -90,13 +90,11 @@ export const WalletPanel = ({ game }: WalletPanelProps) => {
 
   return (
     <>
-      <section className="felt-panel rounded-3xl p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-white">Wallet & balances</h2>
-            <p className="mt-1 text-sm text-slate-300">
-              Connect, approve, deposit, withdraw, and mint test srUSDC through the shared contract hook.
-            </p>
+      <section className="felt-panel machine-panel rounded-3xl p-4 sm:p-5">
+        <div className="machine-panel__titlebar">
+          <div className="min-w-0">
+            <p className="machine-kicker">Cashier</p>
+            <h2 className="truncate text-xl font-black uppercase tracking-[0.08em] text-white">Chips & wallet</h2>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <span className="status-pill bg-white/5 text-slate-200">{game.tokenSymbol}</span>
@@ -106,7 +104,7 @@ export const WalletPanel = ({ game }: WalletPanelProps) => {
                 disabled={!canRequestFunds || actionLocked}
                 onClick={() => setFundModalOpen(true)}
               >
-                Request srUSDC
+                Get test chips
               </button>
             )}
           </div>
@@ -121,13 +119,13 @@ export const WalletPanel = ({ game }: WalletPanelProps) => {
 
         <div className="mt-5">
           <AccordionSection
-            title="Deposit & withdraw"
-            description="Collapsed by default to keep gameplay focused."
+            title="Buy in / cash out"
+            description="Move wallet tokens into table chips or withdraw available chips."
           >
             <div className="grid gap-4 xl:grid-cols-2">
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <h3 className="font-semibold text-white">Deposit</h3>
+                  <h3 className="font-semibold text-white">Buy in</h3>
                   <button
                     className="action-btn action-btn--secondary"
                     disabled={game.walletTokenBalance === 0n || actionLocked}
@@ -176,10 +174,10 @@ export const WalletPanel = ({ game }: WalletPanelProps) => {
                   {actionLocked && (game.txLabel === 'Deposit' || game.txLabel === 'Approve token') ? (
                     <>
                       <span className="action-btn__spinner" aria-hidden="true" />
-                      {game.txLabel === 'Deposit' ? 'Depositing…' : 'Approving…'}
+                      {game.txLabel === 'Deposit' ? 'Buying in…' : 'Approving…'}
                     </>
                   ) : hasEnoughAllowance ? (
-                    `Deposit ${game.tokenSymbol}`
+                    `Buy in ${game.tokenSymbol}`
                   ) : (
                     `Approve ${game.tokenSymbol}`
                   )}
@@ -188,7 +186,7 @@ export const WalletPanel = ({ game }: WalletPanelProps) => {
 
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <h3 className="font-semibold text-white">Withdraw</h3>
+                  <h3 className="font-semibold text-white">Cash out</h3>
                   <button
                     className="action-btn action-btn--secondary"
                     disabled={(state?.available ?? 0n) === 0n || actionLocked}
@@ -204,7 +202,7 @@ export const WalletPanel = ({ game }: WalletPanelProps) => {
                   onChange={(event) => setWithdrawAmount(event.target.value)}
                 />
                 <p className="mt-3 text-sm text-slate-300">
-                  Withdrawals stay available even while paused or excluded.
+                  Cash out any available chips. Bets on the felt stay locked until taken down or resolved.
                 </p>
                 <button
                   className="action-btn action-btn--primary mt-4 w-full"
@@ -217,7 +215,7 @@ export const WalletPanel = ({ game }: WalletPanelProps) => {
                       Withdrawing…
                     </>
                   ) : (
-                    <>Withdraw {game.tokenSymbol}</>
+                    <>Cash out {game.tokenSymbol}</>
                   )}
                 </button>
               </div>

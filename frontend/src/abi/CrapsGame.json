@@ -28,12 +28,12 @@
   {
     "inputs": [
       {
-        "internalType": "enum ICrapsGameV2.BetType",
+        "internalType": "enum ICrapsGameV3.BetType",
         "name": "betType",
         "type": "uint8"
       },
       {
-        "internalType": "enum ICrapsGameV2.PuckState",
+        "internalType": "enum ICrapsGameV3.PuckState",
         "name": "puckState",
         "type": "uint8"
       }
@@ -102,7 +102,7 @@
   {
     "inputs": [
       {
-        "internalType": "enum ICrapsGameV2.BetType",
+        "internalType": "enum ICrapsGameV3.BetType",
         "name": "betType",
         "type": "uint8"
       }
@@ -151,7 +151,7 @@
   {
     "inputs": [
       {
-        "internalType": "enum ICrapsGameV2.BetType",
+        "internalType": "enum ICrapsGameV3.BetType",
         "name": "betType",
         "type": "uint8"
       }
@@ -162,7 +162,7 @@
   {
     "inputs": [
       {
-        "internalType": "enum ICrapsGameV2.BetType",
+        "internalType": "enum ICrapsGameV3.BetType",
         "name": "betType",
         "type": "uint8"
       }
@@ -346,7 +346,7 @@
       },
       {
         "indexed": true,
-        "internalType": "enum ICrapsGameV2.BetType",
+        "internalType": "enum ICrapsGameV3.BetType",
         "name": "betType",
         "type": "uint8"
       },
@@ -371,7 +371,7 @@
       },
       {
         "indexed": true,
-        "internalType": "enum ICrapsGameV2.BetType",
+        "internalType": "enum ICrapsGameV3.BetType",
         "name": "betType",
         "type": "uint8"
       },
@@ -396,7 +396,7 @@
       },
       {
         "indexed": true,
-        "internalType": "enum ICrapsGameV2.BetType",
+        "internalType": "enum ICrapsGameV3.BetType",
         "name": "betType",
         "type": "uint8"
       },
@@ -804,12 +804,12 @@
       {
         "components": [
           {
-            "internalType": "enum ICrapsGameV2.ActionKind",
+            "internalType": "enum ICrapsGameV3.ActionKind",
             "name": "kind",
             "type": "uint8"
           },
           {
-            "internalType": "enum ICrapsGameV2.BetType",
+            "internalType": "enum ICrapsGameV3.BetType",
             "name": "betType",
             "type": "uint8"
           },
@@ -829,7 +829,7 @@
             "type": "bool"
           }
         ],
-        "internalType": "struct ICrapsGameV2.TurnAction[]",
+        "internalType": "struct ICrapsGameV3.TurnAction[]",
         "name": "actions",
         "type": "tuple[]"
       },
@@ -889,12 +889,12 @@
       {
         "components": [
           {
-            "internalType": "enum ICrapsGameV2.SessionPhase",
+            "internalType": "enum ICrapsGameV3.SessionPhase",
             "name": "phase",
             "type": "uint8"
           },
           {
-            "internalType": "enum ICrapsGameV2.PuckState",
+            "internalType": "enum ICrapsGameV3.PuckState",
             "name": "puckState",
             "type": "uint8"
           },
@@ -988,7 +988,7 @@
                     "type": "uint8"
                   }
                 ],
-                "internalType": "struct ICrapsGameV2.Bet",
+                "internalType": "struct ICrapsGameV3.Bet",
                 "name": "passLine",
                 "type": "tuple"
               },
@@ -1010,7 +1010,7 @@
                     "type": "uint8"
                   }
                 ],
-                "internalType": "struct ICrapsGameV2.Bet",
+                "internalType": "struct ICrapsGameV3.Bet",
                 "name": "dontPass",
                 "type": "tuple"
               },
@@ -1032,7 +1032,7 @@
                     "type": "uint8"
                   }
                 ],
-                "internalType": "struct ICrapsGameV2.Bet[4]",
+                "internalType": "struct ICrapsGameV3.Bet[4]",
                 "name": "come",
                 "type": "tuple[4]"
               },
@@ -1054,7 +1054,7 @@
                     "type": "uint8"
                   }
                 ],
-                "internalType": "struct ICrapsGameV2.Bet[4]",
+                "internalType": "struct ICrapsGameV3.Bet[4]",
                 "name": "dontCome",
                 "type": "tuple[4]"
               },
@@ -1071,7 +1071,7 @@
                     "type": "bool"
                   }
                 ],
-                "internalType": "struct ICrapsGameV2.PlaceBet",
+                "internalType": "struct ICrapsGameV3.PlaceBet",
                 "name": "place4",
                 "type": "tuple"
               },
@@ -1088,7 +1088,7 @@
                     "type": "bool"
                   }
                 ],
-                "internalType": "struct ICrapsGameV2.PlaceBet",
+                "internalType": "struct ICrapsGameV3.PlaceBet",
                 "name": "place5",
                 "type": "tuple"
               },
@@ -1105,7 +1105,7 @@
                     "type": "bool"
                   }
                 ],
-                "internalType": "struct ICrapsGameV2.PlaceBet",
+                "internalType": "struct ICrapsGameV3.PlaceBet",
                 "name": "place6",
                 "type": "tuple"
               },
@@ -1122,7 +1122,7 @@
                     "type": "bool"
                   }
                 ],
-                "internalType": "struct ICrapsGameV2.PlaceBet",
+                "internalType": "struct ICrapsGameV3.PlaceBet",
                 "name": "place8",
                 "type": "tuple"
               },
@@ -1139,7 +1139,7 @@
                     "type": "bool"
                   }
                 ],
-                "internalType": "struct ICrapsGameV2.PlaceBet",
+                "internalType": "struct ICrapsGameV3.PlaceBet",
                 "name": "place9",
                 "type": "tuple"
               },
@@ -1156,7 +1156,7 @@
                     "type": "bool"
                   }
                 ],
-                "internalType": "struct ICrapsGameV2.PlaceBet",
+                "internalType": "struct ICrapsGameV3.PlaceBet",
                 "name": "place10",
                 "type": "tuple"
               },
@@ -1173,7 +1173,7 @@
                     "type": "bool"
                   }
                 ],
-                "internalType": "struct ICrapsGameV2.PlaceBet",
+                "internalType": "struct ICrapsGameV3.PlaceBet",
                 "name": "lay4",
                 "type": "tuple"
               },
@@ -1190,7 +1190,7 @@
                     "type": "bool"
                   }
                 ],
-                "internalType": "struct ICrapsGameV2.PlaceBet",
+                "internalType": "struct ICrapsGameV3.PlaceBet",
                 "name": "lay5",
                 "type": "tuple"
               },
@@ -1207,7 +1207,7 @@
                     "type": "bool"
                   }
                 ],
-                "internalType": "struct ICrapsGameV2.PlaceBet",
+                "internalType": "struct ICrapsGameV3.PlaceBet",
                 "name": "lay6",
                 "type": "tuple"
               },
@@ -1224,7 +1224,7 @@
                     "type": "bool"
                   }
                 ],
-                "internalType": "struct ICrapsGameV2.PlaceBet",
+                "internalType": "struct ICrapsGameV3.PlaceBet",
                 "name": "lay8",
                 "type": "tuple"
               },
@@ -1241,7 +1241,7 @@
                     "type": "bool"
                   }
                 ],
-                "internalType": "struct ICrapsGameV2.PlaceBet",
+                "internalType": "struct ICrapsGameV3.PlaceBet",
                 "name": "lay9",
                 "type": "tuple"
               },
@@ -1258,7 +1258,7 @@
                     "type": "bool"
                   }
                 ],
-                "internalType": "struct ICrapsGameV2.PlaceBet",
+                "internalType": "struct ICrapsGameV3.PlaceBet",
                 "name": "lay10",
                 "type": "tuple"
               },
@@ -1270,7 +1270,7 @@
                     "type": "uint256"
                   }
                 ],
-                "internalType": "struct ICrapsGameV2.HardwayBet",
+                "internalType": "struct ICrapsGameV3.HardwayBet",
                 "name": "hard4",
                 "type": "tuple"
               },
@@ -1282,7 +1282,7 @@
                     "type": "uint256"
                   }
                 ],
-                "internalType": "struct ICrapsGameV2.HardwayBet",
+                "internalType": "struct ICrapsGameV3.HardwayBet",
                 "name": "hard6",
                 "type": "tuple"
               },
@@ -1294,7 +1294,7 @@
                     "type": "uint256"
                   }
                 ],
-                "internalType": "struct ICrapsGameV2.HardwayBet",
+                "internalType": "struct ICrapsGameV3.HardwayBet",
                 "name": "hard8",
                 "type": "tuple"
               },
@@ -1306,7 +1306,7 @@
                     "type": "uint256"
                   }
                 ],
-                "internalType": "struct ICrapsGameV2.HardwayBet",
+                "internalType": "struct ICrapsGameV3.HardwayBet",
                 "name": "hard10",
                 "type": "tuple"
               },
@@ -1353,17 +1353,17 @@
                     "type": "uint256"
                   }
                 ],
-                "internalType": "struct ICrapsGameV2.OneRollBets",
+                "internalType": "struct ICrapsGameV3.OneRollBets",
                 "name": "oneRolls",
                 "type": "tuple"
               }
             ],
-            "internalType": "struct ICrapsGameV2.BetSlots",
+            "internalType": "struct ICrapsGameV3.BetSlots",
             "name": "bets",
             "type": "tuple"
           }
         ],
-        "internalType": "struct ICrapsGameV2.PlayerState",
+        "internalType": "struct ICrapsGameV3.PlayerState",
         "name": "state",
         "type": "tuple"
       }

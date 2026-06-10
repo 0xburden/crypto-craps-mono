@@ -11,7 +11,7 @@ import {
   useWatchContractEvent,
   useWriteContract,
 } from 'wagmi';
-import { crapsGameV2Abi } from '../abi/crapsGameV2Abi';
+import { crapsGameV3Abi } from '../abi/crapsGameV3Abi';
 import { srUsdcAbi } from '../abi/srUsdcAbi';
 import { DEFAULT_CHAIN_ID, NETWORK_CONFIG } from '../config/contracts';
 import {
@@ -27,7 +27,7 @@ import {
 } from '../lib/craps';
 import { erc20Abi } from '../lib/erc20Abi';
 
-const crapsGameAbi = crapsGameV2Abi as Abi;
+const crapsGameAbi = crapsGameV3Abi as Abi;
 const rollRequestedEvent = parseAbiItem(
   'event RollRequested(address indexed player, uint256 indexed requestId, uint256 reservedAmount)'
 );
@@ -179,10 +179,13 @@ const applyLocalBetsUpdate = (
   const bets = cloneBets(previous.bets);
   const result = updater(bets) ?? {};
 
+  const nextAvailable = previous.available + (result.availableDelta ?? 0n);
+  const nextInPlay = previous.inPlay + (result.inPlayDelta ?? 0n);
+
   return {
     ...previous,
-    available: previous.available + (result.availableDelta ?? 0n),
-    inPlay: previous.inPlay + (result.inPlayDelta ?? 0n),
+    available: nextAvailable < 0n ? 0n : nextAvailable,
+    inPlay: nextInPlay < 0n ? 0n : nextInPlay,
     lastActivityTime: Math.floor(Date.now() / 1000),
     bets,
   };
@@ -396,6 +399,38 @@ const applyTurnActionToState = (previous: NormalizedPlayerState | null, action: 
 const applyTurnActionsToState = (previous: NormalizedPlayerState | null, actions: TurnAction[]) =>
   actions.reduce((state, action) => applyTurnActionToState(state, action), previous);
 
+const nonNegative = (value: bigint) => (value < 0n ? 0n : value);
+
+const sanitizeDisplayState = (state: NormalizedPlayerState | null) => {
+  if (!state) {
+    return state;
+  }
+
+  return {
+    ...state,
+    available: nonNegative(state.available),
+    inPlay: nonNegative(state.inPlay),
+    reserved: nonNegative(state.reserved),
+  };
+};
+
+const applyDraftActionsToDisplayState = (
+  confirmedState: NormalizedPlayerState | null,
+  actions: TurnAction[],
+) => {
+  const draftState = applyTurnActionsToState(confirmedState, actions);
+  if (!draftState || !confirmedState || actions.length === 0) {
+    return sanitizeDisplayState(draftState);
+  }
+
+  return sanitizeDisplayState({
+    ...draftState,
+    available: confirmedState.available,
+    inPlay: confirmedState.inPlay,
+    reserved: confirmedState.reserved,
+  });
+};
+
 const getOneRollKey = (betType: BetTypeId) => {
   switch (betType) {
     case BET_TYPES.FIELD:
@@ -492,7 +527,7 @@ export interface UseCrapsGameResult {
   isConnected: boolean;
   isSupportedChain: boolean;
   wrongNetwork: boolean;
-  needsMainnetDeployment: boolean;
+  needsGameDeployment: boolean;
   networkLabel: string;
   contractAddress?: Address;
   tokenAddress?: Address;
@@ -568,6 +603,7 @@ export const useCrapsGame = (): UseCrapsGameResult => {
     resolve: () => void;
     reject: (error: unknown) => void;
   } | null>(null);
+  const finalizingTxHashRef = useRef<Hex | null>(null);
   const observedPendingRequestIdRef = useRef<bigint | null>(null);
 
   const txReceiptQuery = useWaitForTransactionReceipt({
@@ -635,6 +671,8 @@ export const useCrapsGame = (): UseCrapsGameResult => {
   }, [address, playerStateQuery.data]);
 
   const [playerState, setPlayerState] = useState<NormalizedPlayerState | null>(null);
+  const [walletTokenBalance, setWalletTokenBalance] = useState<bigint>(0n);
+  const [allowance, setAllowance] = useState<bigint>(0n);
 
   useEffect(() => {
     setPlayerState((previous) => {
@@ -668,6 +706,14 @@ export const useCrapsGame = (): UseCrapsGameResult => {
     }
   }, [optimisticRollPending, queriedPlayerState, suppressPendingSync]);
 
+  useEffect(() => {
+    setWalletTokenBalance(BigInt(walletBalanceQuery.data ?? 0));
+  }, [walletBalanceQuery.data]);
+
+  useEffect(() => {
+    setAllowance(BigInt(allowanceQuery.data ?? 0));
+  }, [allowanceQuery.data]);
+
   const displayPlayerState = useMemo(() => {
     const overlayActions = queuedTurnActions.length > 0
       ? queuedTurnActions
@@ -675,7 +721,7 @@ export const useCrapsGame = (): UseCrapsGameResult => {
         ? pendingRollActions
         : [];
 
-    return applyTurnActionsToState(playerState, overlayActions);
+    return applyDraftActionsToDisplayState(playerState, overlayActions);
   }, [pendingRollActions, playerState, queuedTurnActions]);
 
   const queueTurnAction = useCallback((action: TurnAction) => {
@@ -695,10 +741,34 @@ export const useCrapsGame = (): UseCrapsGameResult => {
 
       if (uniqueTargets.includes('walletBalance')) {
         tasks.push(walletBalanceQuery.refetch());
+        if (publicClient && tokenAddress && address) {
+          tasks.push(
+            publicClient
+              .readContract({
+                address: tokenAddress,
+                abi: erc20Abi,
+                functionName: 'balanceOf',
+                args: [address],
+              })
+              .then((value) => setWalletTokenBalance(nonNegative(BigInt(value as bigint)))),
+          );
+        }
       }
 
       if (uniqueTargets.includes('allowance')) {
         tasks.push(allowanceQuery.refetch());
+        if (publicClient && tokenAddress && contractAddress && address) {
+          tasks.push(
+            publicClient
+              .readContract({
+                address: tokenAddress,
+                abi: erc20Abi,
+                functionName: 'allowance',
+                args: [address, contractAddress],
+              })
+              .then((value) => setAllowance(nonNegative(BigInt(value as bigint)))),
+          );
+        }
       }
 
       if (uniqueTargets.includes('tokenMeta')) {
@@ -707,7 +777,7 @@ export const useCrapsGame = (): UseCrapsGameResult => {
 
       await Promise.allSettled(tasks);
     },
-    [allowanceQuery, decimalsQuery, playerStateQuery, symbolQuery, walletBalanceQuery],
+    [address, allowanceQuery, contractAddress, decimalsQuery, playerStateQuery, publicClient, symbolQuery, tokenAddress, walletBalanceQuery],
   );
 
   const refresh = useCallback(async () => {
@@ -779,6 +849,75 @@ export const useCrapsGame = (): UseCrapsGameResult => {
     },
     [applyPlayerStateSnapshot, readPlayerStateFromChain],
   );
+
+  const settleRelevantData = useCallback(
+    async (
+      targets: RefreshTarget[],
+      options?: { preservePending?: boolean },
+    ) => {
+      for (const delay of [250, 900, 1_600]) {
+        await sleep(delay);
+        await refetchRelevantData(targets);
+
+        if (targets.includes('playerState')) {
+          await syncPlayerStateFromChain(options);
+        }
+      }
+    },
+    [refetchRelevantData, syncPlayerStateFromChain],
+  );
+
+  const readWalletBalanceFromChain = useCallback(async () => {
+    if (!publicClient || !tokenAddress || !address) {
+      return null;
+    }
+
+    try {
+      const value = await publicClient.readContract({
+        address: tokenAddress,
+        abi: erc20Abi,
+        functionName: 'balanceOf',
+        args: [address],
+      });
+      return BigInt(value as bigint);
+    } catch {
+      return null;
+    }
+  }, [address, publicClient, tokenAddress]);
+
+  const readAllowanceFromChain = useCallback(async () => {
+    if (!publicClient || !tokenAddress || !contractAddress || !address) {
+      return null;
+    }
+
+    try {
+      const value = await publicClient.readContract({
+        address: tokenAddress,
+        abi: erc20Abi,
+        functionName: 'allowance',
+        args: [address, contractAddress],
+      });
+      return BigInt(value as bigint);
+    } catch {
+      return null;
+    }
+  }, [address, contractAddress, publicClient, tokenAddress]);
+
+  const syncWalletBalanceFromChain = useCallback(async () => {
+    const value = await readWalletBalanceFromChain();
+    if (value !== null) {
+      setWalletTokenBalance(nonNegative(value));
+    }
+    return value;
+  }, [readWalletBalanceFromChain]);
+
+  const syncAllowanceFromChain = useCallback(async () => {
+    const value = await readAllowanceFromChain();
+    if (value !== null) {
+      setAllowance(nonNegative(value));
+    }
+    return value;
+  }, [readAllowanceFromChain]);
 
   const appendResolvedRoll = useCallback((entry: RollHistoryEntry) => {
     setLastResolvedRoll((previous) => {
@@ -1156,55 +1295,49 @@ export const useCrapsGame = (): UseCrapsGameResult => {
       return;
     }
 
-    let cancelled = false;
+    if (finalizingTxHashRef.current === pendingTxMeta.hash) {
+      return;
+    }
+
+    const meta = pendingTxMeta;
+    const receipt = txReceiptQuery.data as typeof txReceiptQuery.data;
+    finalizingTxHashRef.current = meta.hash;
 
     const finalize = async () => {
       try {
-        if (pendingTxMeta.label === 'Roll dice' || pendingTxMeta.label === 'Confirm & Roll') {
-          const requestId = syncPendingRequestFromReceipt(txReceiptQuery.data as typeof txReceiptQuery.data);
+        if (meta.label === 'Roll dice' || meta.label === 'Confirm & Roll') {
+          const requestId = syncPendingRequestFromReceipt(receipt);
           if (requestId !== null) {
-            void waitForResolvedRollByRequestId(
-              requestId,
-              (txReceiptQuery.data as { blockNumber?: bigint } | undefined)?.blockNumber,
-            );
+            void waitForResolvedRollByRequestId(requestId, (receipt as { blockNumber?: bigint } | undefined)?.blockNumber);
           }
         }
 
-        await pendingTxMeta.onConfirmed?.();
-        await refetchRelevantData(pendingTxMeta.refreshTargets);
+        await meta.onConfirmed?.();
+        await settleRelevantData(meta.refreshTargets, {
+          preservePending: meta.preservePendingOnSync,
+        });
 
-        if (pendingTxMeta.refreshTargets.includes('playerState')) {
-          await syncPlayerStateFromChain({
-            preservePending: pendingTxMeta.preservePendingOnSync,
-          });
-        }
-
-        if (!cancelled) {
-          setTxState({ busy: false, label: pendingTxMeta.label, hash: pendingTxMeta.hash });
-          pendingTxPromiseRef.current?.resolve();
-          pendingTxPromiseRef.current = null;
-          setPendingTxMeta(null);
-        }
+        setTxState({ busy: false, label: meta.label, hash: meta.hash });
+        pendingTxPromiseRef.current?.resolve();
+        pendingTxPromiseRef.current = null;
+        setPendingTxMeta((current) => (current?.hash === meta.hash ? null : current));
       } catch (error) {
-        if (!cancelled) {
-          setTxState({ busy: false, label: pendingTxMeta.label, error: mapContractError(error) });
-          pendingTxPromiseRef.current?.reject(error);
-          pendingTxPromiseRef.current = null;
-          setPendingTxMeta(null);
+        setTxState({ busy: false, label: meta.label, error: mapContractError(error) });
+        pendingTxPromiseRef.current?.reject(error);
+        pendingTxPromiseRef.current = null;
+        setPendingTxMeta((current) => (current?.hash === meta.hash ? null : current));
+      } finally {
+        if (finalizingTxHashRef.current === meta.hash) {
+          finalizingTxHashRef.current = null;
         }
       }
     };
 
     void finalize();
-
-    return () => {
-      cancelled = true;
-    };
   }, [
     pendingTxMeta,
-    refetchRelevantData,
+    settleRelevantData,
     syncPendingRequestFromReceipt,
-    syncPlayerStateFromChain,
     txReceiptQuery.data,
     txReceiptQuery.isSuccess,
     waitForResolvedRollByRequestId,
@@ -1448,74 +1581,6 @@ export const useCrapsGame = (): UseCrapsGameResult => {
       }
 
       await executeTurnActions('Place bet', [{ kind: 'PLACE_BET', betType, index: 0, amount, working: false }], false);
-      setPlayerState((previous) =>
-        applyLocalBetsUpdate(previous, (bets) => {
-          if (betType === BET_TYPES.PASS_LINE) {
-            bets.passLine.amount = BigInt(bets.passLine.amount ?? 0) + amount;
-            return { availableDelta: -amount, inPlayDelta: amount };
-          }
-
-          if (betType === BET_TYPES.PASS_LINE_ODDS) {
-            bets.passLine.oddsAmount = BigInt(bets.passLine.oddsAmount ?? 0) + amount;
-            return { availableDelta: -amount, inPlayDelta: amount };
-          }
-
-          if (betType === BET_TYPES.DONT_PASS) {
-            bets.dontPass.amount = BigInt(bets.dontPass.amount ?? 0) + amount;
-            return { availableDelta: -amount, inPlayDelta: amount };
-          }
-
-          if (betType === BET_TYPES.DONT_PASS_ODDS) {
-            bets.dontPass.oddsAmount = BigInt(bets.dontPass.oddsAmount ?? 0) + amount;
-            return { availableDelta: -amount, inPlayDelta: amount };
-          }
-
-          if (betType === BET_TYPES.COME || betType === BET_TYPES.DONT_COME) {
-            const slots = betType === BET_TYPES.COME ? bets.come : bets.dontCome;
-            const targetIndex = slots.findIndex((slot: any) => BigInt(slot?.amount ?? 0) === 0n);
-            if (targetIndex >= 0) {
-              slots[targetIndex] = {
-                amount: BigInt(slots[targetIndex]?.amount ?? 0) + amount,
-                oddsAmount: BigInt(slots[targetIndex]?.oddsAmount ?? 0),
-                point: Number(slots[targetIndex]?.point ?? 0),
-              };
-            }
-            return { availableDelta: -amount, inPlayDelta: amount };
-          }
-
-          const placeMeta = getPlaceToggleMeta(betType);
-          if (placeMeta) {
-            const current = bets[placeMeta.key] ?? { amount: 0n, working: false };
-            bets[placeMeta.key] = {
-              amount: BigInt(current.amount ?? 0) + amount,
-              working: BigInt(current.amount ?? 0) === 0n ? true : Boolean(current.working),
-            };
-            return { availableDelta: -amount, inPlayDelta: amount };
-          }
-
-          const layMeta = getLayToggleMeta(betType);
-          if (layMeta) {
-            const current = bets[layMeta.key] ?? { amount: 0n, working: false };
-            bets[layMeta.key] = {
-              amount: BigInt(current.amount ?? 0) + amount,
-              working: BigInt(current.amount ?? 0) === 0n ? true : Boolean(current.working),
-            };
-            return { availableDelta: -amount, inPlayDelta: amount };
-          }
-
-          const hardwayKey = getHardwayKey(betType);
-          if (hardwayKey) {
-            bets[hardwayKey].amount = BigInt(bets[hardwayKey].amount ?? 0) + amount;
-            return { availableDelta: -amount, inPlayDelta: amount };
-          }
-
-          const oneRollKey = getOneRollKey(betType);
-          if (oneRollKey) {
-            bets.oneRolls[oneRollKey] = BigInt(bets.oneRolls[oneRollKey] ?? 0) + amount;
-            return { availableDelta: -amount, inPlayDelta: amount };
-          }
-        }),
-      );
     },
     [executeTurnActions, queueTurnAction, turnModeEnabled],
   );
@@ -1532,25 +1597,6 @@ export const useCrapsGame = (): UseCrapsGameResult => {
         [{ kind: 'PLACE_INDEXED_BET', betType, index, amount, working: false }],
         false,
       );
-      setPlayerState((previous) =>
-        applyLocalBetsUpdate(previous, (bets) => {
-          if (betType === BET_TYPES.COME_ODDS) {
-            const slot = bets.come[index];
-            if (slot) {
-              slot.oddsAmount = BigInt(slot.oddsAmount ?? 0) + amount;
-            }
-            return { availableDelta: -amount, inPlayDelta: amount };
-          }
-
-          if (betType === BET_TYPES.DONT_COME_ODDS) {
-            const slot = bets.dontCome[index];
-            if (slot) {
-              slot.oddsAmount = BigInt(slot.oddsAmount ?? 0) + amount;
-            }
-            return { availableDelta: -amount, inPlayDelta: amount };
-          }
-        }),
-      );
     },
     [executeTurnActions, queueTurnAction, turnModeEnabled],
   );
@@ -1563,61 +1609,6 @@ export const useCrapsGame = (): UseCrapsGameResult => {
       }
 
       await executeTurnActions('Remove bet', [{ kind: 'REMOVE_BET', betType, index: 0, amount: 0n, working: false }], false);
-      setPlayerState((previous) =>
-        applyLocalBetsUpdate(previous, (bets) => {
-          if (betType === BET_TYPES.PASS_LINE) {
-            const delta = BigInt(bets.passLine.amount ?? 0) + BigInt(bets.passLine.oddsAmount ?? 0);
-            bets.passLine = { amount: 0n, oddsAmount: 0n, point: 0 };
-            return { availableDelta: delta, inPlayDelta: -delta };
-          }
-
-          if (betType === BET_TYPES.PASS_LINE_ODDS) {
-            const delta = BigInt(bets.passLine.oddsAmount ?? 0);
-            bets.passLine.oddsAmount = 0n;
-            return { availableDelta: delta, inPlayDelta: -delta };
-          }
-
-          if (betType === BET_TYPES.DONT_PASS) {
-            const delta = BigInt(bets.dontPass.amount ?? 0) + BigInt(bets.dontPass.oddsAmount ?? 0);
-            bets.dontPass = { amount: 0n, oddsAmount: 0n, point: 0 };
-            return { availableDelta: delta, inPlayDelta: -delta };
-          }
-
-          if (betType === BET_TYPES.DONT_PASS_ODDS) {
-            const delta = BigInt(bets.dontPass.oddsAmount ?? 0);
-            bets.dontPass.oddsAmount = 0n;
-            return { availableDelta: delta, inPlayDelta: -delta };
-          }
-
-          const placeMeta = getPlaceToggleMeta(betType);
-          if (placeMeta) {
-            const delta = BigInt(bets[placeMeta.key]?.amount ?? 0);
-            bets[placeMeta.key] = { amount: 0n, working: false };
-            return { availableDelta: delta, inPlayDelta: -delta };
-          }
-
-          const layMeta = getLayToggleMeta(betType);
-          if (layMeta) {
-            const delta = BigInt(bets[layMeta.key]?.amount ?? 0);
-            bets[layMeta.key] = { amount: 0n, working: false };
-            return { availableDelta: delta, inPlayDelta: -delta };
-          }
-
-          const hardwayKey = getHardwayKey(betType);
-          if (hardwayKey) {
-            const delta = BigInt(bets[hardwayKey].amount ?? 0);
-            bets[hardwayKey].amount = 0n;
-            return { availableDelta: delta, inPlayDelta: -delta };
-          }
-
-          const oneRollKey = getOneRollKey(betType);
-          if (oneRollKey) {
-            const delta = BigInt(bets.oneRolls[oneRollKey] ?? 0);
-            bets.oneRolls[oneRollKey] = 0n;
-            return { availableDelta: delta, inPlayDelta: -delta };
-          }
-        }),
-      );
     },
     [executeTurnActions, queueTurnAction, turnModeEnabled],
   );
@@ -1633,34 +1624,6 @@ export const useCrapsGame = (): UseCrapsGameResult => {
         'Remove indexed bet',
         [{ kind: 'REMOVE_INDEXED_BET', betType, index, amount: 0n, working: false }],
         false,
-      );
-      setPlayerState((previous) =>
-        applyLocalBetsUpdate(previous, (bets) => {
-          if (betType === BET_TYPES.DONT_COME) {
-            const slot = bets.dontCome[index];
-            const delta = BigInt(slot?.amount ?? 0) + BigInt(slot?.oddsAmount ?? 0);
-            bets.dontCome[index] = { amount: 0n, oddsAmount: 0n, point: 0 };
-            return { availableDelta: delta, inPlayDelta: -delta };
-          }
-
-          if (betType === BET_TYPES.COME_ODDS) {
-            const slot = bets.come[index];
-            const delta = BigInt(slot?.oddsAmount ?? 0);
-            if (slot) {
-              slot.oddsAmount = 0n;
-            }
-            return { availableDelta: delta, inPlayDelta: -delta };
-          }
-
-          if (betType === BET_TYPES.DONT_COME_ODDS) {
-            const slot = bets.dontCome[index];
-            const delta = BigInt(slot?.oddsAmount ?? 0);
-            if (slot) {
-              slot.oddsAmount = 0n;
-            }
-            return { availableDelta: delta, inPlayDelta: -delta };
-          }
-        }),
       );
     },
     [executeTurnActions, queueTurnAction, turnModeEnabled],
@@ -1694,28 +1657,14 @@ export const useCrapsGame = (): UseCrapsGameResult => {
         return;
       }
 
-      await executeTurnActions(
-        working ? 'Turn place bet on' : 'Turn place bet off',
-        placeBetType !== null ? [{ kind: 'SET_BOX_WORKING', betType: placeBetType, index: 0, amount: 0n, working }] : [],
-        false,
-      );
-
       if (placeBetType === null) {
         return;
       }
 
-      setPlayerState((previous) =>
-        applyLocalBetsUpdate(previous, (bets) => {
-          const placeMeta = getPlaceToggleMeta(placeBetType);
-          if (!placeMeta) {
-            return;
-          }
-
-          bets[placeMeta.key] = {
-            ...(bets[placeMeta.key] ?? { amount: 0n, working: false }),
-            working,
-          };
-        }),
+      await executeTurnActions(
+        working ? 'Turn place bet on' : 'Turn place bet off',
+        [{ kind: 'SET_BOX_WORKING', betType: placeBetType, index: 0, amount: 0n, working }],
+        false,
       );
     },
     [executeTurnActions, queueTurnAction, turnModeEnabled],
@@ -1749,28 +1698,14 @@ export const useCrapsGame = (): UseCrapsGameResult => {
         return;
       }
 
-      await executeTurnActions(
-        working ? 'Turn lay bet on' : 'Turn lay bet off',
-        layBetType !== null ? [{ kind: 'SET_BOX_WORKING', betType: layBetType, index: 0, amount: 0n, working }] : [],
-        false,
-      );
-
       if (layBetType === null) {
         return;
       }
 
-      setPlayerState((previous) =>
-        applyLocalBetsUpdate(previous, (bets) => {
-          const layMeta = getLayToggleMeta(layBetType);
-          if (!layMeta) {
-            return;
-          }
-
-          bets[layMeta.key] = {
-            ...(bets[layMeta.key] ?? { amount: 0n, working: false }),
-            working,
-          };
-        }),
+      await executeTurnActions(
+        working ? 'Turn lay bet on' : 'Turn lay bet off',
+        [{ kind: 'SET_BOX_WORKING', betType: layBetType, index: 0, amount: 0n, working }],
+        false,
       );
     },
     [executeTurnActions, queueTurnAction, turnModeEnabled],
@@ -2002,14 +1937,14 @@ export const useCrapsGame = (): UseCrapsGameResult => {
     isConnected,
     isSupportedChain: Boolean(NETWORK_CONFIG[walletChainId as keyof typeof NETWORK_CONFIG]),
     wrongNetwork: Boolean(isConnected && !NETWORK_CONFIG[walletChainId as keyof typeof NETWORK_CONFIG]),
-    needsMainnetDeployment: Boolean(activeChainId !== DEFAULT_CHAIN_ID && !contractAddress),
+    needsGameDeployment: Boolean(!contractAddress),
     networkLabel: network.label,
     contractAddress,
     tokenAddress,
     tokenSymbol: (symbolQuery.data as string | undefined) ?? 'USDC',
     tokenDecimals: Number(decimalsQuery.data ?? 6),
-    walletTokenBalance: (walletBalanceQuery.data as bigint | undefined) ?? 0n,
-    allowance: (allowanceQuery.data as bigint | undefined) ?? 0n,
+    walletTokenBalance,
+    allowance,
     faucetMaxRequestAmount: network.faucetMaxRequestAmount,
     canRequestFaucet,
     playerState: displayPlayerState,
