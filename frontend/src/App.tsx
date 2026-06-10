@@ -115,18 +115,18 @@ const App = () => {
         </div>
 
         <div className="mx-auto max-w-[1600px] px-4 lg:px-6">
-          <div className="table-rail mb-4 rounded-2xl px-4 py-3 text-[0.72rem] uppercase tracking-[0.22em] text-slate-200/80">
-            Pass line · Don't Pass · Come · Don't Come · Place · Hardways · Props
+          <div className="table-rail machine-rail mb-4 rounded-2xl px-4 py-3 text-[0.72rem] uppercase tracking-[0.22em] text-slate-200/80">
+            Bubble craps mode · Get chips · Place bets · Confirm turn · Roll
           </div>
         </div>
 
-        <main className="mx-auto max-w-[1600px] px-4 pb-8 lg:px-6">
-          <div className="table-shell grid gap-5 rounded-[2.25rem] p-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(340px,0.92fr)]">
-            <div className="space-y-5">
+        <main className="mx-auto max-w-[1600px] px-3 pb-8 sm:px-4 lg:px-6">
+          <div className="table-shell machine-cabinet grid gap-4 rounded-[2.25rem] p-2 sm:p-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(340px,0.92fr)]">
+            <div className="machine-table-area space-y-5">
               <GameTable game={game} />
             </div>
 
-            <aside className="space-y-5 xl:sticky xl:top-24 xl:self-start">
+            <aside className="machine-sidecar space-y-4 xl:sticky xl:top-24 xl:self-start">
               <SessionPanel game={game} sessionRemainingSeconds={sessionRemainingSeconds} />
               <RollHistoryPanel game={game} />
               <WalletPanel game={game} />

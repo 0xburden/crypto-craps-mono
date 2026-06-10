@@ -447,3 +447,134 @@ button {
   border-radius: 999px;
   background: rgba(105, 197, 143, 0.26);
 }
+
+.bubble-machine {
+  border-color: rgba(54, 201, 134, 0.28);
+}
+
+.machine-topper {
+  display: grid;
+  gap: 1rem;
+}
+
+.dice-console {
+  min-width: 14rem;
+  border: 1px solid rgba(54, 201, 134, 0.22);
+  border-radius: 1.5rem;
+  background:
+    radial-gradient(circle at top, rgba(54, 201, 134, 0.16), transparent 52%),
+    rgba(3, 12, 7, 0.42);
+  padding: 1rem;
+  text-align: center;
+}
+
+.die-face {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: linear-gradient(145deg, #f8fbf9, #cfd8d2);
+  color: #07110a;
+  font-size: 1.35rem;
+  font-weight: 900;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.28);
+}
+
+.machine-hud {
+  display: grid;
+  gap: 0.5rem;
+  color: #e8f7ef;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.machine-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.machine-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(226, 239, 231, 0.78);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  padding: 0.45rem 0.75rem;
+  text-transform: uppercase;
+}
+
+.machine-step--done {
+  border-color: rgba(54, 201, 134, 0.32);
+  background: rgba(54, 201, 134, 0.13);
+  color: #b9f6d8;
+}
+
+.puck-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(246, 196, 83, 0.55);
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 241, 188, 0.95), rgba(246, 196, 83, 0.18));
+  color: #fff4c7;
+  font-size: 0.63rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  padding: 0.28rem 0.55rem;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+
+.chip-badge--working {
+  border-color: rgba(54, 201, 134, 0.36);
+  background: rgba(54, 201, 134, 0.16);
+  color: #b9f6d8;
+}
+
+.chip-badge--off {
+  border-color: rgba(148, 163, 184, 0.36);
+  background: rgba(15, 23, 42, 0.36);
+  color: #cbd5e1;
+}
+
+@media (min-width: 768px) {
+  .machine-topper {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: stretch;
+  }
+
+  .machine-hud {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (orientation: landscape) and (max-width: 1180px) {
+  .machine-cabinet {
+    grid-template-columns: minmax(740px, 1fr) minmax(300px, 0.42fr);
+    align-items: start;
+    overflow-x: auto;
+  }
+
+  .machine-table-area {
+    min-width: 740px;
+  }
+
+  .machine-sidecar {
+    max-height: calc(100vh - 6rem);
+    overflow: auto;
+    padding-right: 0.25rem;
+  }
+
+  .machine-rail {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}

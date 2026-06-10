@@ -65,7 +65,16 @@ export const GameTable = ({ game }: GameTableProps) => {
   const passLineOdds = BigInt(bets?.passLine?.oddsAmount ?? 0);
   const dontPassAmount = BigInt(bets?.dontPass?.amount ?? 0);
   const dontPassOdds = BigInt(bets?.dontPass?.oddsAmount ?? 0);
-  const pointOn = (state?.point ?? 0) !== 0;
+  const point = state?.point ?? 0;
+  const pointOn = point !== 0;
+  const latestRoll = game.lastResolvedRoll;
+  const latestTotal = latestRoll ? latestRoll.die1 + latestRoll.die2 : null;
+  const guideSteps = [
+    { label: '1 · Get chips', done: game.isConnected && Boolean(state) && (state?.available ?? 0n) > 0n },
+    { label: '2 · Place chips', done: (state?.inPlay ?? 0n) > 0n },
+    { label: '3 · Confirm turn', done: game.queuedTurnActions.length > 0 || state?.phase === SESSION_PHASE.ROLL_PENDING },
+    { label: '4 · Roll', done: Boolean(latestRoll) },
+  ];
 
   const isTableBlocked = !game.isConnected || !state;
   const actionLocked = game.isTxPending;
@@ -117,27 +126,49 @@ export const GameTable = ({ game }: GameTableProps) => {
 
   return (
     <>
-      <section className="felt-panel craps-table-shell rounded-[2rem] p-5 lg:p-6">
-        <div>
-          <p className="text-xs uppercase tracking-[0.28em] text-emerald-300/75">
-            Casino layout
-          </p>
-          <h2 className="text-2xl font-semibold text-white">Traditional craps table</h2>
-          <p className="mt-2 max-w-4xl text-sm text-slate-300">
-            Tap the painted betting zones like a live table. Pass and don’t pass lead from the
-            top rail, place numbers run through the center, and the field, hardways, and props
-            sit below the main action.
-          </p>
-
-          <div className="mt-4 grid max-w-5xl gap-2 text-xs text-slate-200 sm:grid-cols-2 xl:grid-cols-4">
-            <MiniStat label="Puck" value={getPuckLabel(state)} />
-            <MiniStat label="Point" value={state?.point ? state.point.toString() : '—'} />
-            <MiniStat label="In play" value={formatUsd(state?.inPlay)} />
-            <MiniStat
-              label="Surface"
-              value={tableReason ?? (isTableBlocked ? 'Waiting' : 'Open for action')}
-            />
+      <section className="felt-panel craps-table-shell bubble-machine rounded-[2rem] p-4 lg:p-5">
+        <div className="machine-topper">
+          <div>
+            <p className="text-xs uppercase tracking-[0.32em] text-emerald-300/75">
+              Bubble craps terminal
+            </p>
+            <h2 className="mt-1 text-2xl font-semibold text-white">Tap the felt. Queue chips. Roll on-chain.</h2>
+            <p className="mt-2 max-w-4xl text-sm text-slate-300">
+              Machine-style play with wallet chips: place bets on the table map, review your turn,
+              then fire a VRF-backed roll. OFF place/lay bets stay parked through every outcome.
+            </p>
           </div>
+
+          <div className="dice-console" aria-live="polite">
+            <p className="text-[0.68rem] uppercase tracking-[0.24em] text-emerald-100/70">Last roll</p>
+            {latestRoll ? (
+              <>
+                <div className="mt-2 flex items-center justify-center gap-2">
+                  <span className="die-face">{latestRoll.die1}</span>
+                  <span className="die-face">{latestRoll.die2}</span>
+                </div>
+                <p className="mt-2 text-sm text-slate-200">Total {latestTotal} · paid {formatUsd(latestRoll.payout)}</p>
+              </>
+            ) : (
+              <p className="mt-4 text-sm text-slate-300">Waiting for first roll</p>
+            )}
+          </div>
+        </div>
+
+        <div className="machine-hud mt-4">
+          <MiniStat label="Puck" value={getPuckLabel(state)} />
+          <MiniStat label="Point" value={point ? point.toString() : '—'} />
+          <MiniStat label="Chips on table" value={formatUsd(state?.inPlay)} />
+          <MiniStat label="Status" value={tableReason ?? (isTableBlocked ? 'Waiting' : 'Open for action')} />
+        </div>
+
+        <div className="machine-steps mt-3" aria-label="Bubble craps play steps">
+          {guideSteps.map((step, index) => (
+            <span key={step.label} className={`machine-step ${step.done ? 'machine-step--done' : ''}`}>
+              <span>{step.label}</span>
+              {index < guideSteps.length - 1 ? <span className="hidden text-slate-500 sm:inline">→</span> : null}
+            </span>
+          ))}
         </div>
 
         {tableReason && (
@@ -252,6 +283,7 @@ export const GameTable = ({ game }: GameTableProps) => {
                       number={definition.number ?? 0}
                       amount={amount}
                       working={working}
+                      isPoint={point === definition.number}
                       disabledReason={tableReason ?? (!pointOn ? 'Place bets require puck ON.' : null)}
                       onAdd={() => openSimpleModal(definition.label, definition.betType, amount)}
                       onRemove={amount > 0n ? () => void game.removeBet(definition.betType) : undefined}
@@ -294,6 +326,7 @@ export const GameTable = ({ game }: GameTableProps) => {
                       number={definition.number ?? 0}
                       amount={amount}
                       working={working}
+                      isPoint={point === definition.number}
                       variant="lay"
                       disabledReason={tableReason ?? (!pointOn ? 'Lay bets require puck ON.' : null)}
                       onAdd={() => openSimpleModal(definition.label, definition.betType, amount)}
@@ -407,7 +440,7 @@ export const GameTable = ({ game }: GameTableProps) => {
                     <TableZone
                       key={definition.betType}
                       title={definition.label}
-                      subtitle="Easy roll loses"
+                      subtitle="Always working · easy roll or 7 loses"
                       amount={amount}
                       disabledReason={tableReason}
                       onAdd={() => openSimpleModal(definition.label, definition.betType, amount)}
@@ -430,7 +463,7 @@ export const GameTable = ({ game }: GameTableProps) => {
                 </div>
                 <span className="status-pill bg-white/5 text-slate-200">One-roll heavy</span>
               </div>
-              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-7">
+              <div className="prop-grid mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-7">
                 {PROP_ORDER.map((betType) => {
                   const definition = PROP_BETS.find((entry) => entry.betType === betType);
                   if (!definition) {
@@ -556,6 +589,7 @@ const PlaceNumberZone = ({
   number,
   amount,
   working,
+  isPoint = false,
   disabledReason,
   onAdd,
   onRemove,
@@ -566,6 +600,7 @@ const PlaceNumberZone = ({
   number: number;
   amount: bigint;
   working: boolean;
+  isPoint?: boolean;
   disabledReason: string | null;
   onAdd: () => void;
   onRemove?: () => void;
@@ -589,7 +624,10 @@ const PlaceNumberZone = ({
           {variant === 'lay' ? 'Lay to win' : 'Place to win'}
         </p>
       </div>
-      {amount > 0n ? <span className="chip-badge">{working ? 'Working' : 'OFF'}</span> : null}
+      <div className="flex flex-col items-end gap-2">
+        {isPoint ? <span className="puck-marker">PUCK ON</span> : null}
+        {amount > 0n ? <span className={`chip-badge ${working ? 'chip-badge--working' : 'chip-badge--off'}`}>{working ? 'WORKING' : 'OFF'}</span> : null}
+      </div>
     </div>
 
     <p className="mt-4 text-xl font-semibold text-white">{formatUsd(amount)}</p>
@@ -608,7 +646,7 @@ const PlaceNumberZone = ({
 
     {onToggleWorking && amount > 0n && (
       <button className="action-btn action-btn--secondary mt-3 w-full" disabled={actionLocked} onClick={onToggleWorking}>
-        {working ? 'Turn OFF on hit' : 'Turn ON on hit'}
+        {working ? 'Move OFF' : 'Make WORKING'}
       </button>
     )}
   </div>
