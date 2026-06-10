@@ -568,6 +568,7 @@ export const useCrapsGame = (): UseCrapsGameResult => {
     resolve: () => void;
     reject: (error: unknown) => void;
   } | null>(null);
+  const finalizingTxHashRef = useRef<Hex | null>(null);
   const observedPendingRequestIdRef = useRef<bigint | null>(null);
 
   const txReceiptQuery = useWaitForTransactionReceipt({
@@ -1156,50 +1157,49 @@ export const useCrapsGame = (): UseCrapsGameResult => {
       return;
     }
 
-    let cancelled = false;
+    if (finalizingTxHashRef.current === pendingTxMeta.hash) {
+      return;
+    }
+
+    const meta = pendingTxMeta;
+    const receipt = txReceiptQuery.data as typeof txReceiptQuery.data;
+    finalizingTxHashRef.current = meta.hash;
 
     const finalize = async () => {
       try {
-        if (pendingTxMeta.label === 'Roll dice' || pendingTxMeta.label === 'Confirm & Roll') {
-          const requestId = syncPendingRequestFromReceipt(txReceiptQuery.data as typeof txReceiptQuery.data);
+        if (meta.label === 'Roll dice' || meta.label === 'Confirm & Roll') {
+          const requestId = syncPendingRequestFromReceipt(receipt);
           if (requestId !== null) {
-            void waitForResolvedRollByRequestId(
-              requestId,
-              (txReceiptQuery.data as { blockNumber?: bigint } | undefined)?.blockNumber,
-            );
+            void waitForResolvedRollByRequestId(requestId, (receipt as { blockNumber?: bigint } | undefined)?.blockNumber);
           }
         }
 
-        await pendingTxMeta.onConfirmed?.();
-        await refetchRelevantData(pendingTxMeta.refreshTargets);
+        await meta.onConfirmed?.();
+        await refetchRelevantData(meta.refreshTargets);
 
-        if (pendingTxMeta.refreshTargets.includes('playerState')) {
+        if (meta.refreshTargets.includes('playerState')) {
           await syncPlayerStateFromChain({
-            preservePending: pendingTxMeta.preservePendingOnSync,
+            preservePending: meta.preservePendingOnSync,
           });
         }
 
-        if (!cancelled) {
-          setTxState({ busy: false, label: pendingTxMeta.label, hash: pendingTxMeta.hash });
-          pendingTxPromiseRef.current?.resolve();
-          pendingTxPromiseRef.current = null;
-          setPendingTxMeta(null);
-        }
+        setTxState({ busy: false, label: meta.label, hash: meta.hash });
+        pendingTxPromiseRef.current?.resolve();
+        pendingTxPromiseRef.current = null;
+        setPendingTxMeta((current) => (current?.hash === meta.hash ? null : current));
       } catch (error) {
-        if (!cancelled) {
-          setTxState({ busy: false, label: pendingTxMeta.label, error: mapContractError(error) });
-          pendingTxPromiseRef.current?.reject(error);
-          pendingTxPromiseRef.current = null;
-          setPendingTxMeta(null);
+        setTxState({ busy: false, label: meta.label, error: mapContractError(error) });
+        pendingTxPromiseRef.current?.reject(error);
+        pendingTxPromiseRef.current = null;
+        setPendingTxMeta((current) => (current?.hash === meta.hash ? null : current));
+      } finally {
+        if (finalizingTxHashRef.current === meta.hash) {
+          finalizingTxHashRef.current = null;
         }
       }
     };
 
     void finalize();
-
-    return () => {
-      cancelled = true;
-    };
   }, [
     pendingTxMeta,
     refetchRelevantData,

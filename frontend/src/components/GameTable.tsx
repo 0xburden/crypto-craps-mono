@@ -118,19 +118,18 @@ export const GameTable = ({ game }: GameTableProps) => {
   return (
     <>
       <section className="felt-panel craps-table-shell rounded-[2rem] p-5 lg:p-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.28em] text-emerald-300/75">
-              Casino layout
-            </p>
-            <h2 className="text-2xl font-semibold text-white">Traditional craps table</h2>
-            <p className="mt-2 max-w-3xl text-sm text-slate-300">
-              Tap the painted betting zones like a live table. Pass and don’t pass lead from the
-              top rail, place numbers run through the center, and the field, hardways, and props
-              sit below the main action.
-            </p>
-          </div>
-          <div className="grid gap-2 text-xs text-slate-200 sm:grid-cols-2 xl:grid-cols-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.28em] text-emerald-300/75">
+            Casino layout
+          </p>
+          <h2 className="text-2xl font-semibold text-white">Traditional craps table</h2>
+          <p className="mt-2 max-w-4xl text-sm text-slate-300">
+            Tap the painted betting zones like a live table. Pass and don’t pass lead from the
+            top rail, place numbers run through the center, and the field, hardways, and props
+            sit below the main action.
+          </p>
+
+          <div className="mt-4 grid max-w-5xl gap-2 text-xs text-slate-200 sm:grid-cols-2 xl:grid-cols-4">
             <MiniStat label="Puck" value={getPuckLabel(state)} />
             <MiniStat label="Point" value={state?.point ? state.point.toString() : '—'} />
             <MiniStat label="In play" value={formatUsd(state?.inPlay)} />
@@ -491,7 +490,7 @@ export const GameTable = ({ game }: GameTableProps) => {
 const MiniStat = ({ label, value }: { label: string; value: string }) => (
   <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2.5">
     <p className="text-[0.68rem] uppercase tracking-[0.22em] text-slate-400">{label}</p>
-    <p className="mt-1 font-semibold text-white">{value}</p>
+    <p className="mt-1 text-lg font-semibold text-white">{value}</p>
   </div>
 );
 
@@ -654,45 +653,49 @@ const LineZone = ({
       .filter(Boolean)
       .join(' ')}
   >
-    <div className="flex items-start justify-between gap-3">
+    <div className="line-zone__content">
       <div>
-        <h3 className="text-sm font-semibold uppercase tracking-[0.32em] text-white/90">{title}</h3>
-        <p className="mt-2 text-xs uppercase tracking-[0.2em] text-slate-300/85">{subtitle}</p>
-      </div>
-      {amount > 0n ? <span className="chip-badge">Live</span> : null}
-    </div>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-[0.32em] text-white/90">{title}</h3>
+            <p className="mt-2 text-xs uppercase tracking-[0.2em] text-slate-300/85">{subtitle}</p>
+          </div>
+          {amount > 0n ? <span className="chip-badge">Live</span> : null}
+        </div>
 
-    <div className="mt-5 grid gap-3 sm:grid-cols-2">
-      <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Flat</p>
-        <p className="mt-1 text-lg font-semibold text-white">{formatUsd(amount)}</p>
+        {lockLabel && <p className="mt-3 text-xs text-slate-300/80">{lockLabel}</p>}
+        {disabledReason && <p className="mt-3 text-xs text-amber-100">{disabledReason}</p>}
       </div>
-      <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Odds</p>
-        <p className="mt-1 text-lg font-semibold text-white">{formatUsd(oddsAmount)}</p>
+
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Flat</p>
+          <p className="mt-1 text-lg font-semibold text-white">{formatUsd(amount)}</p>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Odds</p>
+          <p className="mt-1 text-lg font-semibold text-white">{formatUsd(oddsAmount)}</p>
+        </div>
       </div>
-    </div>
 
-    {lockLabel && <p className="mt-4 text-xs text-slate-300/80">{lockLabel}</p>}
-    {disabledReason && <p className="mt-3 text-xs text-amber-100">{disabledReason}</p>}
-
-    <div className="mt-5 flex flex-wrap gap-2">
-      <button className="action-btn action-btn--primary" disabled={Boolean(disabledReason) || actionLocked} onClick={onAdd}>
-        {amount > 0n ? 'View flat' : 'Add flat'}
-      </button>
-      <button className="action-btn action-btn--secondary" disabled={!canAddOdds || actionLocked} onClick={onAddOdds}>
-        Add odds
-      </button>
-      {onRemove && amount > 0n && (
-        <button className="action-btn action-btn--danger" disabled={actionLocked} onClick={onRemove}>
-          Remove bet
+      <div className="flex flex-wrap gap-2 lg:justify-end">
+        <button className="action-btn action-btn--primary" disabled={Boolean(disabledReason) || actionLocked} onClick={onAdd}>
+          {amount > 0n ? 'View flat' : 'Add flat'}
         </button>
-      )}
-      {onRemoveOdds && oddsAmount > 0n && (
-        <button className="action-btn action-btn--warning" disabled={actionLocked} onClick={onRemoveOdds}>
-          Remove odds
+        <button className="action-btn action-btn--secondary" disabled={!canAddOdds || actionLocked} onClick={onAddOdds}>
+          Add odds
         </button>
-      )}
+        {onRemove && amount > 0n && (
+          <button className="action-btn action-btn--danger" disabled={actionLocked} onClick={onRemove}>
+            Remove bet
+          </button>
+        )}
+        {onRemoveOdds && oddsAmount > 0n && (
+          <button className="action-btn action-btn--warning" disabled={actionLocked} onClick={onRemoveOdds}>
+            Remove odds
+          </button>
+        )}
+      </div>
     </div>
   </div>
 );
