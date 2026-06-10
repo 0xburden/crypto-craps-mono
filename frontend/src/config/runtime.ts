@@ -1,10 +1,6 @@
 export interface RuntimeConfig {
   baseSepoliaGameAddressV3?: string;
-  baseSepoliaGameAddressV2?: string;
-  baseSepoliaGameAddress?: string;
   baseMainnetGameAddressV3?: string;
-  baseMainnetGameAddressV2?: string;
-  baseMainnetGameAddress?: string;
   baseSepoliaTokenAddress?: string;
   baseMainnetTokenAddress?: string;
   baseSepoliaRpcUrl?: string;

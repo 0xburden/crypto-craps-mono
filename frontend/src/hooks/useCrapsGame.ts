@@ -492,7 +492,7 @@ export interface UseCrapsGameResult {
   isConnected: boolean;
   isSupportedChain: boolean;
   wrongNetwork: boolean;
-  needsMainnetDeployment: boolean;
+  needsGameDeployment: boolean;
   networkLabel: string;
   contractAddress?: Address;
   tokenAddress?: Address;
@@ -2002,7 +2002,7 @@ export const useCrapsGame = (): UseCrapsGameResult => {
     isConnected,
     isSupportedChain: Boolean(NETWORK_CONFIG[walletChainId as keyof typeof NETWORK_CONFIG]),
     wrongNetwork: Boolean(isConnected && !NETWORK_CONFIG[walletChainId as keyof typeof NETWORK_CONFIG]),
-    needsMainnetDeployment: Boolean(activeChainId !== DEFAULT_CHAIN_ID && !contractAddress),
+    needsGameDeployment: Boolean(!contractAddress),
     networkLabel: network.label,
     contractAddress,
     tokenAddress,

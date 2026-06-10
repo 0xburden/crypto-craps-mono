@@ -51,10 +51,10 @@ const App = () => {
       };
     }
 
-    if (game.needsMainnetDeployment) {
+    if (game.needsGameDeployment) {
       return {
         tone: 'amber',
-        message: 'BASE Mainnet support is configured, but the live game contract address is not set yet.',
+        message: `${game.networkLabel} V3 game contract address is not configured. Set the V3 address before playing.`,
       };
     }
 

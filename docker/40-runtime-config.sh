@@ -26,11 +26,7 @@ cat > "$CONFIG_PATH" <<EOF
 // Generated at container startup. Do not cache this file.
 window.__CRAPS_CONFIG__ = {
   baseSepoliaGameAddressV3: $(js_string "${CRAPS_BASE_SEPOLIA_GAME_ADDRESS_V3:-}"),
-  baseSepoliaGameAddressV2: $(js_string "${CRAPS_BASE_SEPOLIA_GAME_ADDRESS_V2:-}"),
-  baseSepoliaGameAddress: $(js_string "${CRAPS_BASE_SEPOLIA_GAME_ADDRESS:-}"),
   baseMainnetGameAddressV3: $(js_string "${CRAPS_BASE_MAINNET_GAME_ADDRESS_V3:-}"),
-  baseMainnetGameAddressV2: $(js_string "${CRAPS_BASE_MAINNET_GAME_ADDRESS_V2:-}"),
-  baseMainnetGameAddress: $(js_string "${CRAPS_BASE_MAINNET_GAME_ADDRESS:-}"),
   baseSepoliaTokenAddress: $(js_string "${CRAPS_BASE_SEPOLIA_TOKEN_ADDRESS:-}"),
   baseMainnetTokenAddress: $(js_string "${CRAPS_BASE_MAINNET_TOKEN_ADDRESS:-}"),
   baseSepoliaRpcUrl: $(js_string "${CRAPS_BASE_SEPOLIA_RPC_URL:-}"),
