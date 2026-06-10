@@ -1,0 +1,21 @@
+{
+  "contractName": "CrapsGameV3",
+  "contractAddress": "0x6C68A59bA628a6153F8f0c746fCf47EBb02e5abf",
+  "payoutMathLibrary": "0x16E5465B5065823C551cFb5D3E1d37C3A8FD7163",
+  "rollResolutionLibrary": "0x4Cc2aa65F7aC1ffb907a7aAd56c6dE2fd53FAf15",
+  "network": "baseSepolia",
+  "chainId": 84532,
+  "deployer": "0x20C04Acbf944a6dB9FA97782A06b21680b8D1A5E",
+  "tokenAddress": "0x8eb2C48C23fdaF506Eb6CB0397A3861AdA57a9dA",
+  "vrfCoordinator": "0x5C210eF41CD1a72de73bF76eC39637bB0d3d7BEE",
+  "vrfSubscriptionId": "21125113605527230557476061461023679129743040007987767634885516918701967522421",
+  "keyHash": "0x9e1344a1247c8a1785d0a4681a27152bffdb43666ae5bf7d14d24a5efd44bf71",
+  "initialBankrollAmount": "50000000000",
+  "paramsFile": "/Users/burden/code/crypto-craps-mono/deployments/generated/sepolia-params.generated.json",
+  "generatedAt": "2026-06-10T20:46:15.111Z",
+  "transactions": {
+    "addConsumer": "0xf033b8dfb061993c1efdfab7029bee24a28c511fa6903c5977b90ac3bff51a76",
+    "approve": "0xd19ba4adc5d8a6d80994995d69922199d2ccce80aa396a2a1cba05804c666317",
+    "fundBankroll": "0xd0e9f1038f1d54f82f97407f1fda28440496eb805eac38efd0b1eae257d039b3"
+  }
+}
