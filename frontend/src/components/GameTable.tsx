@@ -75,6 +75,16 @@ export const GameTable = ({ game }: GameTableProps) => {
     { label: '3 · Confirm turn', done: game.queuedTurnActions.length > 0 || state?.phase === SESSION_PHASE.ROLL_PENDING },
     { label: '4 · Roll', done: Boolean(latestRoll) },
   ];
+  const hasQueuedTurn = game.queuedTurnActions.length > 0;
+  const canRoll =
+    game.isConnected &&
+    state !== null &&
+    state.phase !== SESSION_PHASE.INACTIVE &&
+    state.phase !== SESSION_PHASE.ROLL_PENDING &&
+    state.inPlay > 0n &&
+    !excluded &&
+    !state.paused;
+  const rollButtonLabel = hasQueuedTurn ? 'Confirm & Roll' : 'Roll dice';
 
   const isTableBlocked = !game.isConnected || !state;
   const actionLocked = game.isTxPending;
@@ -126,20 +136,19 @@ export const GameTable = ({ game }: GameTableProps) => {
 
   return (
     <>
-      <section className="felt-panel craps-table-shell bubble-machine rounded-[2rem] p-4 lg:p-5">
-        <div className="machine-topper">
-          <div>
-            <p className="text-xs uppercase tracking-[0.32em] text-emerald-300/75">
-              Bubble craps terminal
-            </p>
-            <h2 className="mt-1 text-2xl font-semibold text-white">Tap the felt. Queue chips. Roll on-chain.</h2>
-            <p className="mt-2 max-w-4xl text-sm text-slate-300">
-              Machine-style play with wallet chips: place bets on the table map, review your turn,
-              then fire a VRF-backed roll. OFF place/lay bets stay parked through every outcome.
-            </p>
+      <section className="felt-panel craps-table-shell bubble-machine rounded-[2rem] p-3 sm:p-4 lg:p-5">
+        <div className="machine-topper min-w-0">
+          <div className="machine-marquee">
+            <p className="machine-kicker">Bubble craps terminal</p>
+            <h2>Tap a betting zone. Queue chips. Roll.</h2>
+            <div className="machine-lamps" aria-label="Game prompts">
+              <span className="machine-lamp machine-lamp--hot">V3 table</span>
+              <span className="machine-lamp">OFF bets park</span>
+              <span className="machine-lamp">VRF dice</span>
+            </div>
           </div>
 
-          <div className="dice-console" aria-live="polite">
+          <div className="dice-console min-w-0" aria-live="polite">
             <p className="text-[0.68rem] uppercase tracking-[0.24em] text-emerald-100/70">Last roll</p>
             {latestRoll ? (
               <>
@@ -150,25 +159,64 @@ export const GameTable = ({ game }: GameTableProps) => {
                 <p className="mt-2 text-sm text-slate-200">Total {latestTotal} · paid {formatUsd(latestRoll.payout)}</p>
               </>
             ) : (
-              <p className="mt-4 text-sm text-slate-300">Waiting for first roll</p>
+              <p className="mt-4 text-sm text-slate-300">Ready for dice</p>
             )}
           </div>
         </div>
 
-        <div className="machine-hud mt-4">
+        <div className="machine-hud mt-3">
           <MiniStat label="Puck" value={getPuckLabel(state)} />
           <MiniStat label="Point" value={point ? point.toString() : '—'} />
-          <MiniStat label="Chips on table" value={formatUsd(state?.inPlay)} />
-          <MiniStat label="Status" value={tableReason ?? (isTableBlocked ? 'Waiting' : 'Open for action')} />
+          <MiniStat label="On table" value={formatUsd(state?.inPlay)} />
+          <MiniStat label="Status" value={tableReason ?? (isTableBlocked ? 'Waiting' : 'Open')} />
         </div>
 
-        <div className="machine-steps mt-3" aria-label="Bubble craps play steps">
-          {guideSteps.map((step, index) => (
-            <span key={step.label} className={`machine-step ${step.done ? 'machine-step--done' : ''}`}>
-              <span>{step.label}</span>
-              {index < guideSteps.length - 1 ? <span className="hidden text-slate-500 sm:inline">→</span> : null}
-            </span>
-          ))}
+        <div className="machine-console mt-3">
+          <div className="machine-console__screen">
+            <p className="text-[0.68rem] uppercase tracking-[0.24em] text-emerald-100/70">Available chips</p>
+            <p className="mt-1 text-3xl font-bold text-white">{formatUsd(state?.available)}</p>
+            <p className="mt-1 text-xs text-emerald-50/75">
+              {hasQueuedTurn
+                ? `${game.queuedTurnActions.length} queued chip move${game.queuedTurnActions.length === 1 ? '' : 's'} ready.`
+                : 'Tap a glowing felt zone to place chips.'}
+            </p>
+          </div>
+          <div className="machine-steps" aria-label="Bubble craps play steps">
+            {guideSteps.map((step, index) => (
+              <span key={step.label} className={`machine-step ${step.done ? 'machine-step--done' : ''}`}>
+                <span>{step.label}</span>
+                {index < guideSteps.length - 1 ? <span className="hidden text-slate-500 sm:inline">→</span> : null}
+              </span>
+            ))}
+          </div>
+          <div className="chip-rail" aria-label="Chip rail visual guide">
+            {['$1', '$5', '$25', '$100'].map((chip) => (
+              <span key={chip} className="chip-token">{chip}</span>
+            ))}
+          </div>
+          <div className="machine-console__actions">
+            <button
+              className="action-btn action-btn--secondary"
+              disabled={!hasQueuedTurn || actionLocked}
+              onClick={game.clearQueuedTurn}
+            >
+              Clear queued chips
+            </button>
+            <button
+              className="action-btn action-btn--primary action-btn--roll"
+              disabled={!canRoll || game.isRolling || actionLocked}
+              onClick={() => void game.rollDice()}
+            >
+              {game.isRolling || (actionLocked && (game.txLabel === 'Roll dice' || game.txLabel === 'Confirm & Roll')) ? (
+                <>
+                  <span className="action-btn__spinner" aria-hidden="true" />
+                  Rolling…
+                </>
+              ) : (
+                rollButtonLabel
+              )}
+            </button>
+          </div>
         </div>
 
         {tableReason && (
@@ -178,11 +226,11 @@ export const GameTable = ({ game }: GameTableProps) => {
         )}
 
         <div className="craps-surface mt-6 overflow-hidden rounded-[2rem] p-4 lg:p-5">
-          <div className="craps-layout">
+          <div className="craps-layout min-w-0">
             <div className="surface-print">
-              <span>Place bets to win</span>
-              <span>Center action</span>
-              <span>Pass line pays even money</span>
+              <span>Tap zones to place chips</span>
+              <span>Working bets glow</span>
+              <span>Roll from the console</span>
             </div>
 
             <div>
@@ -262,11 +310,11 @@ export const GameTable = ({ game }: GameTableProps) => {
                   <p className="text-[0.7rem] uppercase tracking-[0.28em] text-slate-400">
                     Box numbers
                   </p>
-                  <h3 className="mt-1 text-base font-semibold text-white">Place bets</h3>
+                  <h3 className="mt-1 text-base font-semibold text-white">Place numbers</h3>
                 </div>
                 <span className="status-pill bg-white/5 text-slate-200">4 · 5 · 6 · 8 · 9 · 10</span>
               </div>
-              <div className="painted-banner mt-4">Place bets to win</div>
+              <div className="painted-banner mt-4">Tap a number to place chips</div>
               <div className="number-grid mt-3">
                 {PLACE_BETS.map((definition) => {
                   const key = `place${definition.number}` as keyof typeof bets;
@@ -305,11 +353,11 @@ export const GameTable = ({ game }: GameTableProps) => {
                   <p className="text-[0.7rem] uppercase tracking-[0.28em] text-slate-400">
                     Box numbers
                   </p>
-                  <h3 className="mt-1 text-base font-semibold text-white">Lay bets</h3>
+                  <h3 className="mt-1 text-base font-semibold text-white">Lay numbers</h3>
                 </div>
                 <span className="status-pill bg-white/5 text-slate-200">4 · 5 · 6 · 8 · 9 · 10</span>
               </div>
-              <div className="painted-banner mt-4">Lay to win</div>
+              <div className="painted-banner mt-4">Tap behind a number to lay</div>
               <div className="number-grid mt-3">
                 {LAY_BETS.map((definition) => {
                   const key = `lay${definition.number}` as keyof typeof bets;
@@ -509,6 +557,7 @@ export const GameTable = ({ game }: GameTableProps) => {
           currentAmount={modal.currentAmount}
           flatAmount={modal.flatAmount}
           point={modal.point}
+          availableBalance={state?.available ?? 0n}
           isPending={game.isTxPending}
           submitLabel={game.turnModeEnabled ? 'Add to turn' : 'Confirm bet'}
           pendingLabel={game.txLabel === 'Place bet' || game.txLabel === 'Place indexed bet' ? 'Confirming…' : undefined}
@@ -521,9 +570,9 @@ export const GameTable = ({ game }: GameTableProps) => {
 };
 
 const MiniStat = ({ label, value }: { label: string; value: string }) => (
-  <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2.5">
-    <p className="text-[0.68rem] uppercase tracking-[0.22em] text-slate-400">{label}</p>
-    <p className="mt-1 text-lg font-semibold text-white">{value}</p>
+  <div className="min-w-0 rounded-2xl border border-white/10 bg-black/20 px-3 py-2.5">
+    <p className="truncate text-[0.68rem] uppercase tracking-[0.16em] text-slate-400">{label}</p>
+    <p className="mt-1 break-words text-lg font-semibold leading-tight text-white">{value}</p>
   </div>
 );
 
@@ -549,41 +598,46 @@ const TableZone = ({
   compact?: boolean;
   hero?: boolean;
   actionLocked?: boolean;
-}) => (
-  <div
-    className={[
-      'table-zone',
-      `table-zone--${accent}`,
-      amount > 0n ? 'table-zone--active' : '',
-      disabledReason ? 'table-zone--disabled' : '',
-      hero ? 'table-zone--hero' : '',
-    ]
-      .filter(Boolean)
-      .join(' ')}
-  >
-    <div className="flex items-start justify-between gap-3">
-      <div>
-        <p className={`font-semibold text-white ${compact ? 'text-sm' : 'text-base'}`}>{title}</p>
-        <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">{subtitle}</p>
-      </div>
-      {amount > 0n ? <span className="chip-badge">Live</span> : null}
-    </div>
-    <p className={`mt-3 font-semibold text-emerald-100 ${hero ? 'text-2xl' : 'text-lg'}`}>
-      {formatUsd(amount)}
-    </p>
-    {disabledReason && <p className="mt-3 text-xs text-amber-200">{disabledReason}</p>}
-    <div className="mt-4 flex flex-wrap gap-2">
-      <button className="action-btn action-btn--primary" disabled={Boolean(disabledReason) || actionLocked} onClick={onAdd}>
-        {amount > 0n ? 'Add chips' : 'Place bet'}
+}) => {
+  const locked = Boolean(disabledReason) || actionLocked;
+
+  return (
+    <div
+      className={[
+        'table-zone',
+        `table-zone--${accent}`,
+        amount > 0n ? 'table-zone--active' : '',
+        disabledReason ? 'table-zone--disabled' : '',
+        hero ? 'table-zone--hero' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      <button className="zone-hit-button" disabled={locked} onClick={onAdd}>
+        <span className="zone-hit-button__copy">
+          <span className={`font-semibold text-white ${compact ? 'text-sm' : 'text-base'}`}>{title}</span>
+          <span className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-300/85">{subtitle}</span>
+        </span>
+        <span className="zone-hit-button__amount">
+          <span className={hero ? 'text-2xl' : 'text-lg'}>{formatUsd(amount)}</span>
+          <span className="text-[0.68rem] uppercase tracking-[0.18em] text-emerald-100/70">
+            {amount > 0n ? 'Chips live' : 'Tap to place'}
+          </span>
+        </span>
       </button>
-      {onRemove && amount > 0n && (
-        <button className="action-btn action-btn--danger" disabled={actionLocked} onClick={onRemove}>
-          Remove
-        </button>
-      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {amount > 0n ? <span className="chip-badge">Live</span> : null}
+        {disabledReason ? <span className="lock-chip">Locked · {disabledReason}</span> : null}
+        {onRemove && amount > 0n && (
+          <button className="action-btn action-btn--danger" disabled={actionLocked} onClick={onRemove}>
+            Take down
+          </button>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const PlaceNumberZone = ({
   number,
@@ -607,50 +661,55 @@ const PlaceNumberZone = ({
   onToggleWorking?: () => void;
   actionLocked?: boolean;
   variant?: 'place' | 'lay';
-}) => (
-  <div
-    className={[
-      'number-zone',
-      amount > 0n ? 'number-zone--active' : '',
-      disabledReason ? 'number-zone--disabled' : '',
-    ]
-      .filter(Boolean)
-      .join(' ')}
-  >
-    <div className="flex items-start justify-between gap-3">
-      <div>
-        <div className={`number-zone__token number-zone__token--${getNumberTone(number)}`}>{number}</div>
-        <p className="mt-3 text-xs uppercase tracking-[0.22em] text-slate-400">
-          {variant === 'lay' ? 'Lay to win' : 'Place to win'}
-        </p>
-      </div>
-      <div className="flex flex-col items-end gap-2">
+}) => {
+  const locked = Boolean(disabledReason) || actionLocked;
+
+  return (
+    <div
+      className={[
+        'number-zone',
+        amount > 0n ? 'number-zone--active' : '',
+        amount > 0n && working ? 'number-zone--working' : '',
+        amount > 0n && !working ? 'number-zone--off' : '',
+        disabledReason ? 'number-zone--disabled' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      <button className="number-hit-button" disabled={locked} onClick={onAdd}>
+        <span className={`number-zone__token number-zone__token--${getNumberTone(number)}`}>{number}</span>
+        <span className="number-hit-button__copy">
+          <span className="text-xs uppercase tracking-[0.18em] text-slate-300/85">
+            {variant === 'lay' ? 'Lay to win' : 'Place to win'}
+          </span>
+          <span className="text-xl font-semibold text-white">{formatUsd(amount)}</span>
+          <span className="text-[0.68rem] uppercase tracking-[0.18em] text-emerald-100/70">
+            {amount > 0n ? 'Tap to add chips' : 'Tap to place'}
+          </span>
+        </span>
+      </button>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         {isPoint ? <span className="puck-marker">PUCK ON</span> : null}
         {amount > 0n ? <span className={`chip-badge ${working ? 'chip-badge--working' : 'chip-badge--off'}`}>{working ? 'WORKING' : 'OFF'}</span> : null}
+        {disabledReason ? <span className="lock-chip">Locked · {disabledReason}</span> : null}
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+        {onToggleWorking && amount > 0n && (
+          <button className={`action-btn ${working ? 'action-btn--warning' : 'action-btn--primary'}`} disabled={actionLocked} onClick={onToggleWorking}>
+            {working ? 'Turn OFF' : 'Make working'}
+          </button>
+        )}
+        {onRemove && amount > 0n && (
+          <button className="action-btn action-btn--danger" disabled={actionLocked} onClick={onRemove}>
+            Take down
+          </button>
+        )}
       </div>
     </div>
-
-    <p className="mt-4 text-xl font-semibold text-white">{formatUsd(amount)}</p>
-    {disabledReason && <p className="mt-3 text-xs text-amber-200">{disabledReason}</p>}
-
-    <div className="mt-4 flex flex-wrap gap-2">
-      <button className="action-btn action-btn--primary" disabled={Boolean(disabledReason) || actionLocked} onClick={onAdd}>
-        {amount > 0n ? 'Add chips' : variant === 'lay' ? 'Lay' : 'Place'}
-      </button>
-      {onRemove && amount > 0n && (
-        <button className="action-btn action-btn--danger" disabled={actionLocked} onClick={onRemove}>
-          Remove
-        </button>
-      )}
-    </div>
-
-    {onToggleWorking && amount > 0n && (
-      <button className="action-btn action-btn--secondary mt-3 w-full" disabled={actionLocked} onClick={onToggleWorking}>
-        {working ? 'Move OFF' : 'Make WORKING'}
-      </button>
-    )}
-  </div>
-);
+  );
+};
 
 const LineZone = ({
   title,
@@ -692,45 +751,41 @@ const LineZone = ({
       .join(' ')}
   >
     <div className="line-zone__content">
-      <div>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-semibold uppercase tracking-[0.32em] text-white/90">{title}</h3>
-            <p className="mt-2 text-xs uppercase tracking-[0.2em] text-slate-300/85">{subtitle}</p>
-          </div>
-          {amount > 0n ? <span className="chip-badge">Live</span> : null}
-        </div>
+      <button className="zone-hit-button zone-hit-button--line" disabled={Boolean(disabledReason) || actionLocked} onClick={onAdd}>
+        <span className="zone-hit-button__copy">
+          <span className="text-sm font-semibold uppercase tracking-[0.24em] text-white/90">{title}</span>
+          <span className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-300/85">{subtitle}</span>
+          {lockLabel && <span className="mt-2 text-xs text-slate-300/80">{lockLabel}</span>}
+        </span>
+        <span className="zone-hit-button__amount">
+          <span>{formatUsd(amount)}</span>
+          <span className="text-[0.68rem] uppercase tracking-[0.18em] text-emerald-100/70">Flat bet</span>
+        </span>
+      </button>
 
-        {lockLabel && <p className="mt-3 text-xs text-slate-300/80">{lockLabel}</p>}
-        {disabledReason && <p className="mt-3 text-xs text-amber-100">{disabledReason}</p>}
-      </div>
-
-      <div className="grid gap-2.5 sm:grid-cols-2">
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Flat</p>
-          <p className="mt-1 text-lg font-semibold text-white">{formatUsd(amount)}</p>
-        </div>
+      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-1">
         <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
           <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Odds</p>
           <p className="mt-1 text-lg font-semibold text-white">{formatUsd(oddsAmount)}</p>
         </div>
+        <div className="flex flex-wrap gap-2">
+          {amount > 0n ? <span className="chip-badge">Live</span> : null}
+          {disabledReason ? <span className="lock-chip">Locked · {disabledReason}</span> : null}
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2 lg:justify-end">
-        <button className="action-btn action-btn--primary" disabled={Boolean(disabledReason) || actionLocked} onClick={onAdd}>
-          {amount > 0n ? 'View flat' : 'Add flat'}
-        </button>
         <button className="action-btn action-btn--secondary" disabled={!canAddOdds || actionLocked} onClick={onAddOdds}>
           Add odds
         </button>
         {onRemove && amount > 0n && (
           <button className="action-btn action-btn--danger" disabled={actionLocked} onClick={onRemove}>
-            Remove bet
+            Take down
           </button>
         )}
         {onRemoveOdds && oddsAmount > 0n && (
           <button className="action-btn action-btn--warning" disabled={actionLocked} onClick={onRemoveOdds}>
-            Remove odds
+            Take odds
           </button>
         )}
       </div>

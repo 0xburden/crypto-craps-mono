@@ -10,6 +10,7 @@ interface BetModalProps {
   currentAmount?: bigint;
   flatAmount?: bigint;
   point?: number;
+  availableBalance?: bigint;
   isPending?: boolean;
   pendingLabel?: string;
   submitLabel?: string;
@@ -25,6 +26,7 @@ export const BetModal = ({
   currentAmount = 0n,
   flatAmount = 0n,
   point = 0,
+  availableBalance,
   isPending = false,
   pendingLabel,
   submitLabel,
@@ -57,6 +59,12 @@ export const BetModal = ({
     return null;
   }
 
+  const maxByChips = availableBalance === undefined
+    ? rule.maxAdditional
+    : rule.maxAdditional < availableBalance
+      ? rule.maxAdditional
+      : availableBalance;
+
   const parsedAmount = (() => {
     try {
       return parseUsdInput(amount);
@@ -75,11 +83,14 @@ export const BetModal = ({
     if (rule.maxAdditional === 0n) {
       return 'This bet cannot be added right now.';
     }
+    if (availableBalance !== undefined && availableBalance <= 0n) {
+      return 'Get more available chips before placing this bet.';
+    }
     if (parsedAmount < rule.minAdditional) {
       return `Minimum add is ${formatUsd(rule.minAdditional)}.`;
     }
-    if (parsedAmount > rule.maxAdditional) {
-      return `Maximum add is ${formatUsd(rule.maxAdditional)}.`;
+    if (parsedAmount > maxByChips) {
+      return `Available chips cap this add at ${formatUsd(maxByChips)}.`;
     }
     if (rule.step > 1n && parsedAmount % rule.step !== 0n) {
       return `Amount must be a multiple of ${formatUsd(rule.step)}.`;
@@ -103,7 +114,7 @@ export const BetModal = ({
         ? [6_000_000n, 12_000_000n, 18_000_000n, 24_000_000n]
         : [rule.minAdditional, 25_000_000n, 50_000_000n, 100_000_000n]
   )
-    .filter((entry, index, list) => entry > 0n && entry <= rule.maxAdditional && list.indexOf(entry) === index)
+    .filter((entry, index, list) => entry > 0n && entry <= maxByChips && list.indexOf(entry) === index)
     .slice(0, 4);
 
   const formatQuickAmountLabel = (entry: bigint) => (isPlaceBet ? formatUsdInput(entry) : formatUsd(entry));
@@ -111,7 +122,7 @@ export const BetModal = ({
   const handleIncrement = () => {
     const baseAmount = parsedAmount > 0n ? parsedAmount : 0n;
     const nextAmount = baseAmount === 0n ? rule.minAdditional : baseAmount + rule.step;
-    const boundedAmount = nextAmount > rule.maxAdditional ? rule.maxAdditional : nextAmount;
+    const boundedAmount = nextAmount > maxByChips ? maxByChips : nextAmount;
 
     if (boundedAmount > 0n) {
       setAmount(formatUsdInput(boundedAmount));
@@ -176,19 +187,19 @@ export const BetModal = ({
             {rule.step > 1n && rule.maxAdditional > 0n && (
               <button
                 className="action-btn action-btn--secondary"
-                disabled={submitting || isPending || parsedAmount >= rule.maxAdditional}
+                disabled={submitting || isPending || parsedAmount >= maxByChips}
                 onClick={handleIncrement}
               >
                 +{isPlaceBet ? formatUsdInput(rule.step) : formatUsd(rule.step)}
               </button>
             )}
-            {rule.maxAdditional > 0n && (
+            {maxByChips > 0n && (
               <button
                 className="action-btn action-btn--warning"
                 disabled={submitting || isPending}
-                onClick={() => setAmount(formatUsdInput(rule.maxAdditional))}
+                onClick={() => setAmount(formatUsdInput(maxByChips))}
               >
-                Max
+                Max chips
               </button>
             )}
           </div>

@@ -16,6 +16,7 @@ body,
 }
 
 body {
+  overflow-x: hidden;
   background:
     radial-gradient(circle at top, rgba(54, 201, 134, 0.16), transparent 32%),
     linear-gradient(180deg, #07110a 0%, #0b1910 100%);
@@ -28,6 +29,32 @@ body {
 
 button {
   font: inherit;
+}
+
+button,
+input {
+  min-width: 0;
+}
+
+.felt-panel,
+.table-shell,
+.craps-surface,
+.craps-layout,
+.craps-band,
+.slot-track,
+.table-zone,
+.number-zone,
+.slot-card,
+.line-zone {
+  min-width: 0;
+}
+
+.felt-panel,
+.table-zone,
+.number-zone,
+.slot-card,
+.line-zone {
+  overflow-wrap: anywhere;
 }
 
 .modal-overlay {
@@ -175,6 +202,7 @@ button {
 
 .table-zone {
   position: relative;
+  overflow: hidden;
   border: 1px solid rgba(105, 197, 143, 0.18);
   border-radius: 1.25rem;
   background: linear-gradient(180deg, rgba(8, 23, 14, 0.9), rgba(4, 16, 10, 0.9));
@@ -205,7 +233,19 @@ button {
 .table-zone--disabled,
 .number-zone--disabled,
 .line-zone--disabled {
-  opacity: 0.58;
+  border-style: dashed;
+  filter: saturate(0.78);
+}
+
+.table-zone--disabled::before,
+.number-zone--disabled::before,
+.line-zone--disabled::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: rgba(148, 163, 184, 0.045);
 }
 
 .table-zone--gold {
@@ -234,6 +274,7 @@ button {
 
 .number-zone {
   position: relative;
+  overflow: hidden;
   border: 1px solid rgba(105, 197, 143, 0.2);
   border-radius: 1.5rem;
   background:
@@ -273,6 +314,7 @@ button {
 }
 
 .slot-card {
+  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 1.25rem;
   background: rgba(255, 255, 255, 0.04);
@@ -291,6 +333,7 @@ button {
 
 .line-zone {
   position: relative;
+  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 1.75rem;
   background:
@@ -351,7 +394,8 @@ button {
 }
 
 .bet-card--disabled {
-  opacity: 0.45;
+  border-style: dashed;
+  filter: saturate(0.78);
 }
 
 .bet-card--active {
@@ -364,13 +408,16 @@ button {
   align-items: center;
   justify-content: center;
   min-width: 2.25rem;
+  max-width: 100%;
   padding: 0.25rem 0.55rem;
   border-radius: 999px;
   background: rgba(246, 196, 83, 0.14);
   border: 1px solid rgba(246, 196, 83, 0.3);
   color: #f6c453;
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 800;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
 .action-btn {
@@ -378,12 +425,26 @@ button {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  min-width: 0;
+  min-height: 2.55rem;
+  max-width: 100%;
   border-radius: 0.75rem;
   border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 0.6rem 0.9rem;
+  color: #eef7f1;
   font-size: 0.9rem;
-  font-weight: 600;
-  transition: all 150ms ease;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+  transition: transform 150ms ease, border-color 150ms ease, background 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.action-btn:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
 }
 
 .action-btn__spinner {
@@ -404,39 +465,51 @@ button {
 
 .action-btn:disabled {
   cursor: not-allowed;
-  opacity: 0.45;
+  color: #94a3b8;
+  border-color: rgba(148, 163, 184, 0.24);
+  background:
+    repeating-linear-gradient(135deg, rgba(148, 163, 184, 0.08) 0 6px, rgba(15, 23, 42, 0.16) 6px 12px),
+    rgba(15, 23, 42, 0.42);
+  box-shadow: none;
+  transform: none;
 }
 
 .action-btn--primary {
-  background: #36c986;
+  border-color: rgba(113, 255, 190, 0.36);
+  background: linear-gradient(180deg, #43e099, #27b978);
   color: #04140a;
 }
 
 .action-btn--secondary {
-  background: rgba(255, 255, 255, 0.05);
-  color: #eef7f1;
+  border-color: rgba(105, 197, 143, 0.28);
+  background: linear-gradient(180deg, rgba(50, 123, 82, 0.32), rgba(22, 65, 42, 0.42));
+  color: #e8fff2;
 }
 
 .action-btn--danger {
-  background: rgba(220, 76, 100, 0.15);
-  color: #ffb5c0;
-  border-color: rgba(220, 76, 100, 0.22);
+  background: linear-gradient(180deg, rgba(220, 76, 100, 0.28), rgba(126, 29, 53, 0.32));
+  color: #ffd0d8;
+  border-color: rgba(220, 76, 100, 0.36);
 }
 
 .action-btn--warning {
-  background: rgba(246, 196, 83, 0.16);
-  color: #f6c453;
-  border-color: rgba(246, 196, 83, 0.2);
+  background: linear-gradient(180deg, rgba(246, 196, 83, 0.28), rgba(121, 84, 20, 0.34));
+  color: #ffe9a8;
+  border-color: rgba(246, 196, 83, 0.36);
 }
 
 .status-pill {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+  min-width: 0;
+  max-width: 100%;
   border-radius: 999px;
   padding: 0.3rem 0.7rem;
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 800;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 
 .scrollbar-thin::-webkit-scrollbar {
@@ -457,8 +530,70 @@ button {
   gap: 1rem;
 }
 
+.machine-marquee {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(54, 201, 134, 0.18);
+  border-radius: 1.5rem;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(54, 201, 134, 0.18), transparent 42%),
+    linear-gradient(180deg, rgba(4, 19, 10, 0.72), rgba(3, 12, 7, 0.42));
+  padding: 1rem;
+}
+
+.machine-kicker {
+  color: rgba(110, 255, 183, 0.78);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: clamp(0.12em, 1.8vw, 0.28em);
+  text-transform: uppercase;
+}
+
+.machine-marquee h2 {
+  margin-top: 0.35rem;
+  color: #f3fff8;
+  font-size: clamp(1.35rem, 3.1vw, 2.4rem);
+  font-weight: 900;
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+  text-transform: uppercase;
+}
+
+.machine-lamps,
+.chip-rail,
+.machine-console__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.machine-lamps {
+  margin-top: 0.85rem;
+}
+
+.machine-lamp {
+  min-width: 0;
+  border: 1px solid rgba(105, 197, 143, 0.28);
+  border-radius: 999px;
+  background: rgba(54, 201, 134, 0.1);
+  color: #dfffee;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+  line-height: 1.1;
+  padding: 0.35rem 0.7rem;
+  text-transform: uppercase;
+}
+
+.machine-lamp--hot {
+  border-color: rgba(246, 196, 83, 0.5);
+  background: rgba(246, 196, 83, 0.16);
+  color: #ffe8a3;
+}
+
 .dice-console {
-  min-width: 14rem;
+  min-width: min(14rem, 100%);
   border: 1px solid rgba(54, 201, 134, 0.22);
   border-radius: 1.5rem;
   background:
@@ -488,6 +623,64 @@ button {
   gap: 0.5rem;
   color: #e8f7ef;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.machine-console {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid rgba(54, 201, 134, 0.2);
+  border-radius: 1.5rem;
+  background:
+    linear-gradient(90deg, rgba(4, 24, 13, 0.82), rgba(13, 38, 24, 0.64)),
+    rgba(2, 8, 4, 0.35);
+  padding: 0.85rem;
+}
+
+.machine-console__screen {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.1rem;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 0.8rem;
+}
+
+.machine-console__screen p {
+  overflow-wrap: anywhere;
+}
+
+.machine-console__actions {
+  align-items: stretch;
+}
+
+.machine-console__actions .action-btn {
+  flex: 1 1 11rem;
+}
+
+.action-btn--roll {
+  min-height: 3.15rem;
+  border-color: rgba(246, 196, 83, 0.58);
+  background:
+    radial-gradient(circle at top, rgba(255, 236, 161, 0.96), rgba(246, 196, 83, 0.82) 45%, rgba(205, 136, 35, 0.92));
+  color: #231505;
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.chip-token {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.65rem;
+  height: 2.65rem;
+  border: 2px dashed rgba(255, 255, 255, 0.32);
+  border-radius: 999px;
+  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.22), rgba(246, 196, 83, 0.18) 45%, rgba(14, 35, 22, 0.78));
+  color: #fff4c7;
+  font-size: 0.82rem;
+  font-weight: 900;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
 }
 
 .machine-steps {
@@ -546,35 +739,105 @@ button {
 
 @media (min-width: 768px) {
   .machine-topper {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(12rem, 16rem);
     align-items: stretch;
   }
 
   .machine-hud {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+
+  .machine-console {
+    grid-template-columns: minmax(12rem, 0.9fr) minmax(0, 1.1fr);
+    align-items: center;
+  }
+
+  .machine-console__actions {
+    justify-content: flex-end;
+  }
+}
+
+@media (min-width: 1180px) {
+  .machine-console {
+    grid-template-columns: minmax(12rem, 0.95fr) minmax(18rem, 1.35fr) auto minmax(15rem, 0.9fr);
+  }
+}
+
+@media (max-width: 640px), (orientation: landscape) and (max-height: 560px) {
+  .painted-banner,
+  .surface-print,
+  .machine-step {
+    letter-spacing: 0.12em;
+  }
+
+  .painted-banner {
+    padding-inline: 0.75rem;
+  }
+
+  .craps-surface,
+  .craps-band,
+  .slot-track,
+  .table-zone,
+  .number-zone,
+  .slot-card {
+    padding: 0.75rem;
+  }
+
+  .action-btn {
+    min-height: 2.35rem;
+    padding: 0.55rem 0.7rem;
+    font-size: 0.82rem;
+  }
+
+  .die-face {
+    width: 2.35rem;
+    height: 2.35rem;
+  }
 }
 
 @media (orientation: landscape) and (max-width: 1180px) {
   .machine-cabinet {
-    grid-template-columns: minmax(740px, 1fr) minmax(300px, 0.42fr);
+    grid-template-columns: minmax(0, 1fr);
     align-items: start;
-    overflow-x: auto;
+    overflow: hidden;
   }
 
   .machine-table-area {
-    min-width: 740px;
+    min-width: 0;
   }
 
   .machine-sidecar {
-    max-height: calc(100vh - 6rem);
-    overflow: auto;
-    padding-right: 0.25rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(280px, 1fr));
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
   }
 
   .machine-rail {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+}
+
+@media (orientation: landscape) and (max-width: 900px) {
+  .machine-sidecar {
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+    scroll-snap-type: x proximity;
+  }
+
+  .machine-sidecar > * {
+    min-width: min(22rem, calc(100vw - 2rem));
+    scroll-snap-align: start;
+  }
+
+  .machine-hud {
+    grid-template-columns: repeat(4, minmax(8rem, 1fr));
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
   }
 }
