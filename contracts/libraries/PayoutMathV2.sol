@@ -102,18 +102,45 @@ library PayoutMathV2 {
         uint8 point,
         uint16 layWinVigBps
     ) internal pure returns (uint256 grossWin, uint256 vig, uint256 netWin) {
-        if (stake == 0) {
+        grossWin = _layGrossWin(stake, betType, point);
+        if (grossWin == 0) {
             return (0, 0, 0);
+        }
+
+        vig = (grossWin * layWinVigBps) / 10_000;
+        netWin = grossWin - vig;
+    }
+
+    function layNetWin(
+        uint256 stake,
+        ICrapsGameV2.BetType betType,
+        uint8 point,
+        uint16 layWinVigBps
+    ) internal pure returns (uint256) {
+        uint256 grossWin = _layGrossWin(stake, betType, point);
+        if (grossWin == 0) {
+            return 0;
+        }
+
+        uint256 vig = (grossWin * layWinVigBps) / 10_000;
+        return grossWin - vig;
+    }
+
+    function _layGrossWin(
+        uint256 stake,
+        ICrapsGameV2.BetType betType,
+        uint8 point
+    ) private pure returns (uint256) {
+        if (stake == 0) {
+            return 0;
         }
 
         (uint256 numerator, uint256 denominator) = payoutMultiplier(betType, point);
         if (numerator == 0 || denominator == 0) {
-            return (0, 0, 0);
+            return 0;
         }
 
-        grossWin = (stake * numerator) / denominator;
-        vig = (grossWin * layWinVigBps) / 10_000;
-        netWin = grossWin - vig;
+        return (stake * numerator) / denominator;
     }
 
     function maxPossiblePayout(

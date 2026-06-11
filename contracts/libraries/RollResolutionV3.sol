@@ -311,7 +311,7 @@ library RollResolutionV3 {
             return (_setLayBet(updatedBets, target, ICrapsGameV3.PlaceBet({amount: 0, working: false})), 0, 0, bet.amount);
         }
         if (sum == 7) {
-            (, , uint256 netWin) = PayoutMathV3.layNetWinAmount(bet.amount, betType, target, layWinVigBps);
+            uint256 netWin = PayoutMathV3.layNetWin(bet.amount, betType, target, layWinVigBps);
             return (_setLayBet(updatedBets, target, ICrapsGameV3.PlaceBet({amount: 0, working: false})), bet.amount, netWin, 0);
         }
         return (updatedBets, 0, 0, 0);
