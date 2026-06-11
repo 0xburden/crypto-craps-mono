@@ -920,10 +920,34 @@ input {
   padding: 0.28rem 0.6rem;
 }
 
+.machine-header__actions {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.machine-header__hud {
+  display: grid;
+  min-width: 0;
+  gap: 0.55rem;
+}
+
 .machine-header__meters {
   display: grid;
   min-width: 0;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.machine-header__state {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.5rem;
 }
 
@@ -947,7 +971,7 @@ input {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 1rem;
   background: rgba(255, 255, 255, 0.045);
-  padding: 0.65rem 0.75rem;
+  padding: 0.55rem 0.7rem;
 }
 
 .machine-meter p,
@@ -1083,11 +1107,11 @@ input {
   }
 
   .machine-header__meters {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .machine-bankroll {
-    grid-column: auto;
+    grid-column: span 2;
   }
 
   .machine-console {
@@ -1143,16 +1167,65 @@ input {
   grid-template-columns: minmax(0, 1fr) !important;
 }
 
-.machine-sidecar {
+.machine-control-deck {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  min-width: 0;
   align-items: start;
-  max-height: none;
-  overflow: visible;
+  gap: 1rem;
 }
 
-.machine-sidecar > * {
+.machine-control-deck__station,
+.machine-control-deck__secondary,
+.machine-control-deck__history,
+.machine-control-deck__wallet,
+.machine-control-deck__utility {
   min-width: 0;
+}
+
+.machine-control-deck__secondary {
+  display: grid;
+  align-items: start;
+  gap: 1rem;
+}
+
+.machine-utility-panel {
+  display: grid;
+  min-width: 0;
+  gap: 1rem;
+  align-items: center;
+}
+
+.machine-utility-panel__copy,
+.machine-utility-panel__accordion {
+  min-width: 0;
+}
+
+.machine-utility-panel__accordion > * {
+  height: 100%;
+}
+
+@media (min-width: 900px) {
+  .machine-control-deck {
+    grid-template-columns: minmax(18rem, 0.9fr) minmax(18rem, 1fr);
+  }
+
+  .machine-utility-panel {
+    grid-template-columns: minmax(16rem, 0.8fr) minmax(20rem, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .machine-control-deck {
+    grid-template-columns: minmax(18rem, 0.9fr) minmax(0, 2.2fr);
+  }
+
+  .machine-control-deck__secondary {
+    grid-template-columns: minmax(20rem, 0.95fr) minmax(28rem, 1.25fr);
+  }
+
+  .machine-control-deck__utility {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (orientation: landscape) and (max-width: 1180px) {
@@ -1166,11 +1239,6 @@ input {
     min-width: 0;
   }
 
-  .machine-sidecar {
-    grid-template-columns: repeat(2, minmax(280px, 1fr));
-    padding-right: 0;
-  }
-
   .machine-rail {
     white-space: nowrap;
     overflow: hidden;
@@ -1179,7 +1247,7 @@ input {
 }
 
 @media (orientation: landscape) and (max-width: 900px) {
-  .machine-sidecar {
+  .machine-control-deck {
     display: flex;
     gap: 1rem;
     overflow-x: auto;
@@ -1187,7 +1255,12 @@ input {
     scroll-snap-type: x proximity;
   }
 
-  .machine-sidecar > * {
+  .machine-control-deck__secondary {
+    display: contents;
+  }
+
+  .machine-control-deck > *,
+  .machine-control-deck__secondary > * {
     min-width: min(22rem, calc(100vw - 2rem));
     scroll-snap-align: start;
   }
@@ -1588,9 +1661,30 @@ body {
   }
 }
 
+@media (min-width: 1024px) {
+  .machine-header__meters {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(11rem, 1fr);
+  }
+
+  .machine-bankroll {
+    grid-column: auto;
+  }
+}
+
+@media (min-width: 1280px) {
+  .machine-header__hud {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .machine-header__state {
+    justify-content: flex-end;
+  }
+}
+
 @media (min-width: 1536px) {
   .machine-header__meters {
-    grid-template-columns: repeat(4, minmax(9rem, 1fr)) minmax(11rem, 1.05fr);
+    grid-template-columns: repeat(4, minmax(8rem, 1fr)) minmax(11rem, 1.05fr);
   }
 }
 

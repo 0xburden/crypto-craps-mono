@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BET_TYPES, type BetTypeId, getBetInputRule } from '../lib/craps';
-import { formatUsd, formatUsdInput, parseUsdInput } from '../lib/format';
+import { TOKEN_DECIMALS, formatUsd, formatUsdInput, parseUsdInput } from '../lib/format';
 
 interface BetModalProps {
   open: boolean;
@@ -65,6 +65,17 @@ export const BetModal = ({
       ? rule.maxAdditional
       : availableBalance;
 
+  const floorToStep = (value: bigint) => {
+    if (value <= 0n || rule.step <= 1n) {
+      return value;
+    }
+
+    return value - (value % rule.step);
+  };
+
+  const maxValidByChips = floorToStep(maxByChips);
+  const usd = 10n ** BigInt(TOKEN_DECIMALS);
+
   const parsedAmount = (() => {
     try {
       return parseUsdInput(amount);
@@ -106,15 +117,22 @@ export const BetModal = ({
   const isPlaceSixUnitBet = betType === BET_TYPES.PLACE_6 || betType === BET_TYPES.PLACE_8;
 
   const isPlaceBet = isPlaceFiveUnitBet || isPlaceSixUnitBet;
+  const isWholeUsdStepBet = rule.step >= usd;
+
+  const stepQuickAmounts = [1n, 10n, 20n, 50n].map((multiplier) => rule.step * multiplier);
+  const genericQuickAmounts = isWholeUsdStepBet
+    ? stepQuickAmounts
+    : [rule.minAdditional, 25n * usd, 50n * usd, 100n * usd];
 
   const quickAmounts = (
     isPlaceFiveUnitBet
-      ? [5_000_000n, 10_000_000n, 15_000_000n, 25_000_000n]
+      ? [5n * usd, 10n * usd, 15n * usd, 25n * usd]
       : isPlaceSixUnitBet
-        ? [6_000_000n, 12_000_000n, 18_000_000n, 24_000_000n]
-        : [rule.minAdditional, 25_000_000n, 50_000_000n, 100_000_000n]
+        ? [6n * usd, 12n * usd, 18n * usd, 24n * usd]
+        : genericQuickAmounts
   )
-    .filter((entry, index, list) => entry > 0n && entry <= maxByChips && list.indexOf(entry) === index)
+    .map((entry) => (entry === rule.minAdditional ? entry : floorToStep(entry)))
+    .filter((entry, index, list) => entry > 0n && entry <= maxByChips && entry % rule.step === 0n && list.indexOf(entry) === index)
     .slice(0, 4);
 
   const formatQuickAmountLabel = (entry: bigint) => (isPlaceBet ? formatUsdInput(entry) : formatUsd(entry));
@@ -122,7 +140,7 @@ export const BetModal = ({
   const handleIncrement = () => {
     const baseAmount = parsedAmount > 0n ? parsedAmount : 0n;
     const nextAmount = baseAmount === 0n ? rule.minAdditional : baseAmount + rule.step;
-    const boundedAmount = nextAmount > maxByChips ? maxByChips : nextAmount;
+    const boundedAmount = nextAmount > maxValidByChips ? maxValidByChips : nextAmount;
 
     if (boundedAmount > 0n) {
       setAmount(formatUsdInput(boundedAmount));
@@ -155,8 +173,13 @@ export const BetModal = ({
             <h3 className="text-xl font-semibold text-white">{title}</h3>
             <p className="mt-2 text-sm text-slate-300">{description ?? rule.note}</p>
           </div>
-          <button className="action-btn action-btn--secondary" onClick={onClose}>
-            Close
+          <button
+            className="action-btn action-btn--secondary h-11 w-11 shrink-0 p-0 text-xl leading-none"
+            aria-label="Close bet modal"
+            title="Close"
+            onClick={onClose}
+          >
+            ×
           </button>
         </div>
 
@@ -187,17 +210,17 @@ export const BetModal = ({
             {rule.step > 1n && rule.maxAdditional > 0n && (
               <button
                 className="action-btn action-btn--secondary"
-                disabled={submitting || isPending || parsedAmount >= maxByChips}
+                disabled={submitting || isPending || parsedAmount >= maxValidByChips}
                 onClick={handleIncrement}
               >
                 +{isPlaceBet ? formatUsdInput(rule.step) : formatUsd(rule.step)}
               </button>
             )}
-            {maxByChips > 0n && (
+            {maxValidByChips > 0n && (
               <button
                 className="action-btn action-btn--warning"
                 disabled={submitting || isPending}
-                onClick={() => setAmount(formatUsdInput(maxByChips))}
+                onClick={() => setAmount(formatUsdInput(maxValidByChips))}
               >
                 Max chips
               </button>

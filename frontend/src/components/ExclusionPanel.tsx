@@ -19,11 +19,13 @@ export const ExclusionPanel = ({
 
   if (!state) {
     return (
-      <section className="felt-panel rounded-3xl p-5">
-        <h2 className="text-lg font-semibold text-white">Responsible gambling</h2>
-        <p className="mt-2 text-sm text-slate-300">
-          Connect a wallet to access self-exclusion controls.
-        </p>
+      <section className="felt-panel machine-utility-panel rounded-3xl p-4 sm:p-5">
+        <div className="machine-utility-panel__copy">
+          <h2 className="text-lg font-semibold text-white">Responsible gambling</h2>
+          <p className="mt-1 text-sm text-slate-300">
+            Connect a wallet to access self-exclusion controls.
+          </p>
+        </div>
       </section>
     );
   }
@@ -35,13 +37,15 @@ export const ExclusionPanel = ({
       reinstatementRemainingSeconds <= 0;
 
     return (
-      <section className="felt-panel rounded-3xl border border-rose-400/20 p-5">
-        <h2 className="text-lg font-semibold text-white">Play restricted</h2>
-        <p className="mt-2 text-sm text-slate-300">
-          You can still withdraw {formatUsd(state.available)} at any time.
-        </p>
+      <section className="felt-panel machine-utility-panel rounded-3xl border border-rose-400/20 p-4 sm:p-5">
+        <div className="machine-utility-panel__copy">
+          <h2 className="text-lg font-semibold text-white">Play restricted</h2>
+          <p className="mt-1 text-sm text-slate-300">
+            You can still withdraw {formatUsd(state.available)} at any time.
+          </p>
+        </div>
 
-        <div className="mt-4">
+        <div className="machine-utility-panel__accordion">
           <AccordionSection
             title="Self-exclusion controls"
             description="Collapsed by default. Open to manage reinstatement or review restriction details."
@@ -98,12 +102,14 @@ export const ExclusionPanel = ({
   }
 
   return (
-    <section className="felt-panel rounded-3xl p-5">
-      <h2 className="text-lg font-semibold text-white">Responsible gambling</h2>
-      <p className="mt-2 text-sm text-slate-300">
-        Self-exclusion ends your active session immediately, keeps withdrawals available, and requires a 7-day cooldown before returning.
-      </p>
-      <div className="mt-4">
+    <section className="felt-panel machine-utility-panel rounded-3xl p-4 sm:p-5">
+      <div className="machine-utility-panel__copy">
+        <h2 className="text-lg font-semibold text-white">Responsible gambling</h2>
+        <p className="mt-1 text-sm text-slate-300">
+          Self-exclusion ends your active session immediately, keeps withdrawals available, and requires a 7-day cooldown before returning.
+        </p>
+      </div>
+      <div className="machine-utility-panel__accordion">
         <AccordionSection
           title="Self-exclusion controls"
           description="Collapsed by default. Open to review the policy or self-exclude this account."

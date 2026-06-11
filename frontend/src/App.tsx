@@ -121,19 +121,29 @@ const App = () => {
         </div>
 
         <main className="mx-auto max-w-[1600px] px-3 pb-8 sm:px-4 lg:px-6">
-          <div className="table-shell machine-cabinet grid min-w-0 gap-4 rounded-[2.25rem] p-2 sm:p-3 xl:grid-cols-[minmax(0,1.82fr)_minmax(320px,0.76fr)]">
+          <div className="table-shell machine-cabinet grid min-w-0 gap-4 rounded-[2.25rem] p-2 sm:p-3">
             <div className="machine-table-area min-w-0 space-y-5">
               <GameTable game={game} />
             </div>
 
-            <aside className="machine-sidecar min-w-0 space-y-4 xl:sticky xl:top-24 xl:self-start">
-              <SessionPanel game={game} sessionRemainingSeconds={sessionRemainingSeconds} />
-              <RollHistoryPanel game={game} />
-              <WalletPanel game={game} />
-              <ExclusionPanel
-                game={game}
-                reinstatementRemainingSeconds={reinstatementRemainingSeconds}
-              />
+            <aside className="machine-control-deck min-w-0">
+              <div className="machine-control-deck__station">
+                <SessionPanel game={game} sessionRemainingSeconds={sessionRemainingSeconds} />
+              </div>
+              <div className="machine-control-deck__secondary">
+                <div className="machine-control-deck__history">
+                  <RollHistoryPanel game={game} />
+                </div>
+                <div className="machine-control-deck__wallet">
+                  <WalletPanel game={game} />
+                </div>
+                <div className="machine-control-deck__utility">
+                  <ExclusionPanel
+                    game={game}
+                    reinstatementRemainingSeconds={reinstatementRemainingSeconds}
+                  />
+                </div>
+              </div>
             </aside>
           </div>
         </main>

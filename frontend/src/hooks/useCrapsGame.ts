@@ -701,6 +701,10 @@ export const useCrapsGame = (): UseCrapsGameResult => {
       return queriedPlayerState;
     });
 
+    if (queriedPlayerState?.phase === SESSION_PHASE.ROLL_PENDING) {
+      setPendingRollActions([]);
+    }
+
     if (suppressPendingSync && queriedPlayerState && queriedPlayerState.phase !== SESSION_PHASE.ROLL_PENDING) {
       setSuppressPendingSync(false);
     }
@@ -809,6 +813,10 @@ export const useCrapsGame = (): UseCrapsGameResult => {
 
         return normalized;
       });
+
+      if (normalized.phase === SESSION_PHASE.ROLL_PENDING) {
+        setPendingRollActions([]);
+      }
 
       if (suppressPendingSync && normalized.phase !== SESSION_PHASE.ROLL_PENDING) {
         setSuppressPendingSync(false);
