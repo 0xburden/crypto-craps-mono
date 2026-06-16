@@ -1,0 +1,24 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: crypto-craps-frontend:latest
+    restart: unless-stopped
+    expose:
+      - "80"
+    environment:
+      CRAPS_BASE_SEPOLIA_GAME_ADDRESS_V3: ${CRAPS_BASE_SEPOLIA_GAME_ADDRESS_V3:-}
+      CRAPS_BASE_MAINNET_GAME_ADDRESS_V3: ${CRAPS_BASE_MAINNET_GAME_ADDRESS_V3:-}
+      CRAPS_BASE_SEPOLIA_TOKEN_ADDRESS: ${CRAPS_BASE_SEPOLIA_TOKEN_ADDRESS:-}
+      CRAPS_BASE_MAINNET_TOKEN_ADDRESS: ${CRAPS_BASE_MAINNET_TOKEN_ADDRESS:-}
+      CRAPS_BASE_SEPOLIA_RPC_URL: ${CRAPS_BASE_SEPOLIA_RPC_URL:-}
+      CRAPS_BASE_MAINNET_RPC_URL: ${CRAPS_BASE_MAINNET_RPC_URL:-}
+      CRAPS_WALLETCONNECT_PROJECT_ID: ${CRAPS_WALLETCONNECT_PROJECT_ID:-}
+      CRAPS_DEFAULT_CHAIN_ID: ${CRAPS_DEFAULT_CHAIN_ID:-84532}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
